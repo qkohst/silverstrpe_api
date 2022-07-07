@@ -1,0 +1,9 @@
+---
+Name: approutes
+After:
+  - "#rootroutes"
+  - "#coreroutes"
+---
+SilverStripe\Control\Director:
+  rules:
+    "api/v1/warna//$Action/$ID": WarnaController
