@@ -7,22 +7,238 @@ use SilverStripe\Core\Convert;
 class WarnaController extends PageController
 {
     private static $allowed_actions = [
-        'getDataWarnaColumn',
-        'getDataWarna',
-        'doSave',
-        'edit',
-        'doUpdate',
-        'doDelete'
+        'store',
+        'show',
+        'update',
+        'delete'
     ];
+
     public function index(HTTPRequest $request)
     {
-        $dataWarna = Warna::get()->where('Deleted = 0')->sort('NamaWarna');
+        $dataArray = array();
+
+        $dataWarna = Warna::get()->where('Deleted = 0');
+
+        foreach ($dataWarna as $warna) {
+            $temparr = array();
+            $temparr['ID'] = $warna->ID;
+            $temparr['NamaWarna'] = $warna->NamaWarna;
+            $temparr['Status'] = $warna->Status;
+            $dataArray[] = $temparr;
+        }
+
         $data = [
-            "status" => "success",
-            "message" => "List of Data Warna",
-            "data" => $dataWarna,
+            "status" => [
+                "code" => 200,
+                "description" => "OK",
+                "message" => [
+                    "List Warna"
+                ],
+            ],
+            "data" => $dataArray
         ];
+
         $this->response->addHeader('Content-Type', 'application/json');
         return json_encode($data);
+    }
+
+    public function store(HTTPRequest $request)
+    {
+        // Validation required 
+        $NamaWarna = (isset($_REQUEST['NamaWarna'])) ? $_REQUEST['NamaWarna'] : '';
+        if (trim($NamaWarna) == null) {
+            $data = [
+                "status" => [
+                    "code" => 422,
+                    "description" => "Unprocessable Entity",
+                    "message" => [
+                        "Nama warna tidak boleh kosong"
+                    ]
+                ]
+            ];
+        } else {
+            // Validation unique
+            $check_warna = Warna::get()->where('Deleted = 0')->filter([
+                'NamaWarna' => Convert::raw2sql($NamaWarna)
+            ]);
+            if (count($check_warna) != 0) {
+                $data = [
+                    "status" => [
+                        "code" => 409,
+                        "description" => "Conflict",
+                        "message" => [
+                            "Nama warna sudah tersedia"
+                        ]
+                    ],
+                ];
+            } else {
+                $warna = Warna::create();
+                $warna->NamaWarna = Convert::raw2sql($NamaWarna);
+                $warna->Status = 1;
+                $warna->write();
+
+                $data = [
+                    "status" => [
+                        "code" => 201,
+                        "description" => "Created",
+                        "message" => [
+                            "Berhasil disimpan"
+                        ]
+                    ],
+                ];
+            }
+        }
+
+        $this->response->addHeader('Content-Type', 'application/json');
+        return json_encode($data);
+    }
+
+    public function show(HTTPRequest $request)
+    {
+        $id = $request->params()["ID"];
+        $warna = Warna::get()->byID($id);
+
+        if (is_null($warna)) {
+            $data = [
+                "status" => [
+                    "code" => 404,
+                    "description" => "Not Found",
+                    "message" => [
+                        "Warna dengan ID " . $id . " tidak ditemukan"
+                    ]
+                ]
+            ];
+        } else {
+            $data = [
+                "status" => [
+                    "code" => 200,
+                    "description" => "OK",
+                    "message" => [
+                        "Detail Warna"
+                    ],
+                ],
+                "data" => [
+                    "ID" => $warna->ID,
+                    "NamaWarna" => $warna->NamaWarna,
+                    "Status" => $warna->Status
+                ]
+            ];
+        }
+
+        $this->response->addHeader('Content-Type', 'application/json');
+        return json_encode($data);
+    }
+
+    public function update(HTTPRequest $request)
+    {
+        $id = $request->params()["ID"];
+        $warna = Warna::get()->byID($id);
+
+        // Validation null 
+        if (is_null($warna)) {
+            $data = [
+                "status" => [
+                    "code" => 404,
+                    "description" => "Not Found",
+                    "message" => [
+                        "Warna dengan ID " . $id . " tidak ditemukan"
+                    ]
+                ]
+            ];
+        } else {
+            // Validation required
+            $NamaWarna =  (isset($_REQUEST['NamaWarna'])) ? $_REQUEST['NamaWarna'] : '';
+            $Status =  (isset($_REQUEST['Status'])) ? $_REQUEST['Status'] : '';
+
+            if (trim($NamaWarna) == null || trim($Status) == null) {
+                $message = [];
+                if (trim($NamaWarna) == null) {
+                    array_push($message, "Nama warna tidak boleh kosong");
+                }
+                if (trim($Status) == null) {
+                    array_push($message, "Status tidak boleh kosong");
+                }
+                $data = [
+                    "status" => [
+                        "code" => 422,
+                        "description" => "Unprocessable Entity",
+                        "message" => $message
+                    ],
+                ];
+            } else {
+                // Validation unique
+                $check_warna = Warna::get()->where('Deleted = 0')->filter([
+                    'NamaWarna' => Convert::raw2sql($NamaWarna)
+                ])->first();
+                if (!is_null($check_warna) && $check_warna->ID != $warna->ID) {
+                    $data = [
+                        "status" => [
+                            "code" => 409,
+                            "description" => "Conflict",
+                            "message" => [
+                                "Nama warna sudah tersedia"
+                            ]
+                        ],
+                    ];
+                } else {
+                    $warna->update([
+                        'NamaWarna' => Convert::raw2sql($NamaWarna),
+                        'Status' => Convert::raw2sql($Status)
+                    ]);
+                    $warna->write();
+                    $data = [
+                        "status" => [
+                            "code" => 200,
+                            "description" => "OK",
+                            "message" => [
+                                "Berhasil diupdate"
+                            ]
+                        ],
+                    ];
+                }
+            }
+        }
+
+        $this->response->addHeader('Content-Type', 'application/json');
+        return json_encode($data);
+    }
+
+    public function delete(HTTPRequest $request)
+    {
+        $id = $request->params()["ID"];
+        $warna = Warna::get()->byID($id);
+
+        // Validation null 
+        if (is_null($warna)) {
+            $data = [
+                "status" => [
+                    "code" => 404,
+                    "description" => "Not Found",
+                    "message" => [
+                        "Warna dengan ID " . $id . " tidak ditemukan"
+                    ]
+                ]
+            ];
+        } else {
+            $warna->update([
+                'Deleted' => 1
+
+            ]);
+            $warna->write();
+            $data = [
+                "status" => [
+                    "code" => 200,
+                    "description" => "OK",
+                    "message" => [
+                        "Berhasil dihapus"
+                    ]
+                ],
+            ];
+        }
+
+        $this->response->addHeader('Content-Type', 'application/json');
+        return json_encode($data);
+
+        // Kurang Validasi Ketika ID Sudah Digunakan Pada Table Lain 
     }
 }
