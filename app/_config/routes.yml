@@ -7,3 +7,4 @@ After:
 SilverStripe\Control\Director:
   rules:
     "api/v1/warna//$Action/$ID": WarnaController
+    "api/v1/product//$Action/$ID": ProductController

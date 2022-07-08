@@ -27,7 +27,7 @@ class WarnaController extends PageController
             $dataArray[] = $temparr;
         }
 
-        $data = [
+        $response = [
             "status" => [
                 "code" => 200,
                 "description" => "OK",
@@ -39,7 +39,7 @@ class WarnaController extends PageController
         ];
 
         $this->response->addHeader('Content-Type', 'application/json');
-        return json_encode($data);
+        return json_encode($response);
     }
 
     public function store(HTTPRequest $request)
@@ -47,7 +47,7 @@ class WarnaController extends PageController
         // Validation required 
         $NamaWarna = (isset($_REQUEST['NamaWarna'])) ? $_REQUEST['NamaWarna'] : '';
         if (trim($NamaWarna) == null) {
-            $data = [
+            $response = [
                 "status" => [
                     "code" => 422,
                     "description" => "Unprocessable Entity",
@@ -62,7 +62,7 @@ class WarnaController extends PageController
                 'NamaWarna' => Convert::raw2sql($NamaWarna)
             ]);
             if (count($check_warna) != 0) {
-                $data = [
+                $response = [
                     "status" => [
                         "code" => 409,
                         "description" => "Conflict",
@@ -77,7 +77,7 @@ class WarnaController extends PageController
                 $warna->Status = 1;
                 $warna->write();
 
-                $data = [
+                $response = [
                     "status" => [
                         "code" => 201,
                         "description" => "Created",
@@ -90,7 +90,7 @@ class WarnaController extends PageController
         }
 
         $this->response->addHeader('Content-Type', 'application/json');
-        return json_encode($data);
+        return json_encode($response);
     }
 
     public function show(HTTPRequest $request)
@@ -99,7 +99,7 @@ class WarnaController extends PageController
         $warna = Warna::get()->byID($id);
 
         if (is_null($warna)) {
-            $data = [
+            $response = [
                 "status" => [
                     "code" => 404,
                     "description" => "Not Found",
@@ -109,7 +109,7 @@ class WarnaController extends PageController
                 ]
             ];
         } else {
-            $data = [
+            $response = [
                 "status" => [
                     "code" => 200,
                     "description" => "OK",
@@ -126,7 +126,7 @@ class WarnaController extends PageController
         }
 
         $this->response->addHeader('Content-Type', 'application/json');
-        return json_encode($data);
+        return json_encode($response);
     }
 
     public function update(HTTPRequest $request)
@@ -136,7 +136,7 @@ class WarnaController extends PageController
 
         // Validation null 
         if (is_null($warna)) {
-            $data = [
+            $response = [
                 "status" => [
                     "code" => 404,
                     "description" => "Not Found",
@@ -156,14 +156,14 @@ class WarnaController extends PageController
                     array_push($message, "Nama warna tidak boleh kosong");
                 }
                 if (trim($Status) == null) {
-                    array_push($message, "Status tidak boleh kosong");
+                    array_push($message, "Silahkan pilih status");
                 }
-                $data = [
+                $response = [
                     "status" => [
                         "code" => 422,
                         "description" => "Unprocessable Entity",
                         "message" => $message
-                    ],
+                    ]
                 ];
             } else {
                 // Validation unique
@@ -171,7 +171,7 @@ class WarnaController extends PageController
                     'NamaWarna' => Convert::raw2sql($NamaWarna)
                 ])->first();
                 if (!is_null($check_warna) && $check_warna->ID != $warna->ID) {
-                    $data = [
+                    $response = [
                         "status" => [
                             "code" => 409,
                             "description" => "Conflict",
@@ -186,7 +186,7 @@ class WarnaController extends PageController
                         'Status' => Convert::raw2sql($Status)
                     ]);
                     $warna->write();
-                    $data = [
+                    $response = [
                         "status" => [
                             "code" => 200,
                             "description" => "OK",
@@ -200,7 +200,7 @@ class WarnaController extends PageController
         }
 
         $this->response->addHeader('Content-Type', 'application/json');
-        return json_encode($data);
+        return json_encode($response);
     }
 
     public function delete(HTTPRequest $request)
@@ -210,7 +210,7 @@ class WarnaController extends PageController
 
         // Validation null 
         if (is_null($warna)) {
-            $data = [
+            $response = [
                 "status" => [
                     "code" => 404,
                     "description" => "Not Found",
@@ -222,10 +222,10 @@ class WarnaController extends PageController
         } else {
             $warna->update([
                 'Deleted' => 1
-
             ]);
             $warna->write();
-            $data = [
+            
+            $response = [
                 "status" => [
                     "code" => 200,
                     "description" => "OK",
@@ -237,7 +237,7 @@ class WarnaController extends PageController
         }
 
         $this->response->addHeader('Content-Type', 'application/json');
-        return json_encode($data);
+        return json_encode($response);
 
         // Kurang Validasi Ketika ID Sudah Digunakan Pada Table Lain 
     }
