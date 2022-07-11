@@ -1,7 +1,6 @@
 <?php
 
 use SilverStripe\Control\HTTPRequest;
-use SilverStripe\Control\Director;
 use SilverStripe\Core\Convert;
 
 class WarnaController extends PageController
@@ -224,7 +223,7 @@ class WarnaController extends PageController
                 'Deleted' => 1
             ]);
             $warna->write();
-            
+
             $response = [
                 "status" => [
                     "code" => 200,
