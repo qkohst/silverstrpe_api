@@ -8,5 +8,6 @@ class User extends DataObject
         'NamaLengkap' => 'Varchar(45)',
         'Email' => 'Varchar(45)',
         'Password' => 'Varchar',
+        'SessionID' => 'Varchar(45)',
     ];
 }

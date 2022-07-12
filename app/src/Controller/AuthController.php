@@ -6,13 +6,19 @@ use SilverStripe\Core\Convert;
 use SilverStripe\Core\Environment;
 
 
-class AuthController extends ContentController
+class AuthController extends PageController
 {
     private static $allowed_actions = [
         'login',
         'register',
         'changepassword'
     ];
+
+    public function init()
+    {
+        parent::init();
+    }
+
 
     public function login(HTTPRequest $request)
     {
@@ -51,12 +57,21 @@ class AuthController extends ContentController
 
             // Check Password
             if (password_verify($Password, $user->Password) == 1) {
-                // $secret  = Environment::getEnv('SS_API_SECRET_KEY');
+                $secret  = Environment::getEnv('SS_API_SECRET_KEY');
                 // $dateTime = date("Y-m-d H:i:s");
                 // $convertedTime = date('Y-m-d H:i:s', strtotime('+60 minutes', strtotime($dateTime)));
                 // $data = $user->Email;
                 // $token = hash_hmac('sha256', $data, $secret);
+
                 // BUAT TOKEN DISINI
+                $payload = [
+                    'session_id' => md5(rand()),
+                    'email' => $user->Email
+                ];
+                $token = \Firebase\JWT\JWT::encode($payload, $secret, 'HS256');
+
+                // $jwt_decode = json_decode(base64_decode(str_replace('_', '/', str_replace('-', '+', explode('.', $jwt)[1]))));
+
                 $response = [
                     "status" => [
                         "code" => 200,
@@ -65,10 +80,12 @@ class AuthController extends ContentController
                             'Login berhasil'
                         ]
                     ],
-                    // "data" => [
-                    //     "token" => $token,
-                    //     "exp" => $convertedTime
-                    // ]
+                    "data" => [
+                        "token" => $token,
+                        // "jwt_decode" => $jwt_decode,
+                        // 'NamaLengkap' => $user->NamaLengkap,
+                        // 'Email' => $user->Email,
+                    ]
                 ];
             } else {
                 $response = [
