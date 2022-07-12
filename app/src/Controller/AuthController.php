@@ -1,6 +1,7 @@
 <?php
 
 use SilverStripe\CMS\Controllers\ContentController;
+use SilverStripe\Control\Director;
 use SilverStripe\Control\HTTPRequest;
 use SilverStripe\Core\Convert;
 use SilverStripe\Core\Environment;
@@ -11,7 +12,8 @@ class AuthController extends PageController
     private static $allowed_actions = [
         'login',
         'register',
-        'changepassword'
+        'changepassword',
+        'logout',
     ];
 
     public function init()
@@ -57,20 +59,12 @@ class AuthController extends PageController
 
             // Check Password
             if (password_verify($Password, $user->Password) == 1) {
-                $secret  = Environment::getEnv('SS_API_SECRET_KEY');
-                // $dateTime = date("Y-m-d H:i:s");
-                // $convertedTime = date('Y-m-d H:i:s', strtotime('+60 minutes', strtotime($dateTime)));
-                // $data = $user->Email;
-                // $token = hash_hmac('sha256', $data, $secret);
+                $token = md5($Email . date("Y-m-d H:i:s"));
 
-                // BUAT TOKEN DISINI
-                $payload = [
-                    'session_id' => md5(rand()),
-                    'email' => $user->Email
-                ];
-                $token = \Firebase\JWT\JWT::encode($payload, $secret, 'HS256');
-
-                // $jwt_decode = json_decode(base64_decode(str_replace('_', '/', str_replace('-', '+', explode('.', $jwt)[1]))));
+                $user->update([
+                    'Token' => $token,
+                ]);
+                $user->write();
 
                 $response = [
                     "status" => [
@@ -81,10 +75,7 @@ class AuthController extends PageController
                         ]
                     ],
                     "data" => [
-                        "token" => $token,
-                        // "jwt_decode" => $jwt_decode,
-                        // 'NamaLengkap' => $user->NamaLengkap,
-                        // 'Email' => $user->Email,
+                        "Token" => $token
                     ]
                 ];
             } else {
@@ -190,6 +181,113 @@ class AuthController extends PageController
 
     public function changepassword(HTTPRequest $request)
     {
-        // 
+        $PasswordLama = (isset($_REQUEST['PasswordLama'])) ? $_REQUEST['PasswordLama'] : '';
+        $PasswordBaru = (isset($_REQUEST['PasswordBaru'])) ? $_REQUEST['PasswordBaru'] : '';
+        $KonfirmasiPassword = (isset($_REQUEST['KonfirmasiPassword'])) ? $_REQUEST['KonfirmasiPassword'] : '';
+        // Validate Required 
+        if (trim($PasswordLama) == null || trim($PasswordBaru) == null) {
+            $message = [];
+            if (trim($PasswordLama) == null) {
+                array_push($message, "Password lama tidak boleh kosong");
+            }
+            if (trim($PasswordBaru) == null) {
+                array_push($message, "Password baru tidak boleh kosong");
+            }
+
+            $response = [
+                "status" => [
+                    "code" => 422,
+                    "description" => "Unprocessable Entity",
+                    "message" => $message
+                ]
+            ];
+        } else {
+            // Check user
+            $getHeaders = apache_request_headers();
+            $bearer = $getHeaders['Authorization'];
+            $token = substr($bearer, 7);
+
+            $userLogin = User::get()->filter(['Token' => $token])->first();
+            $check = password_verify($PasswordLama, $userLogin->Password);
+            
+            // Validate Old Password
+            if (password_verify($PasswordLama, $userLogin->Password) == 1) {
+
+                // Validate New Password 
+                if (strlen($_REQUEST['PasswordBaru']) < 8) {
+                    $response = [
+                        "status" => [
+                            "code" => 422,
+                            "description" => "Unprocessable Entity",
+                            "message" => [
+                                'Password baru minimal terdiri 8 karakter'
+                            ]
+                        ]
+                    ];
+                } elseif ($_REQUEST['PasswordBaru'] == $_REQUEST['KonfirmasiPassword']) {
+                    $userLogin->update([
+                        'Password' => password_hash($_REQUEST['PasswordBaru'], PASSWORD_DEFAULT)
+                    ]);
+                    $userLogin->write();
+                    $response = [
+                        "status" => [
+                            "code" => 200,
+                            "description" => "OK",
+                            "message" => [
+                                'Password berhasil diganti'
+                            ]
+                        ]
+                    ];
+                } else {
+                    $response = [
+                        "status" => [
+                            "code" => 422,
+                            "description" => "Unprocessable Entity",
+                            "message" => [
+                                'Password baru dan Konfirmasi password harus sama'
+                            ]
+                        ]
+                    ];
+                }
+            } else {
+                $response = [
+                    "status" => [
+                        "code" => 422,
+                        "description" => "Unprocessable Entity",
+                        "message" => [
+                            'Password lama tidak sesuai'
+                        ]
+                    ]
+                ];
+            }
+        }
+        $this->response->addHeader('Content-Type', 'application/json');
+        return json_encode($response);
+    }
+
+    public function logout(HTTPRequest $request)
+    {
+        $getHeaders = apache_request_headers();
+        $bearer = $getHeaders['Authorization'];
+        $token = substr($bearer, 7);
+
+        $userLogin = User::get()->filter(['Token' => $token])->first();
+        $userLogin->update([
+            'Token' => null,
+        ]);
+        $userLogin->write();
+
+        $response = [
+            "status" => [
+                "code" => 200,
+                "description" => "OK",
+                "message" => [
+                    'Logout berhasil'
+                ]
+            ],
+        ];
+
+        $this->response->addHeader('Content-Type', 'application/json');
+        return json_encode($response);
     }
 }

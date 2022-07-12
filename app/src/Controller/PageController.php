@@ -54,7 +54,47 @@ namespace {
                 echo json_encode($response);
                 die;
             }
-            
+
+            // Check Token 
+            $url = $_SERVER['REQUEST_URI'];
+            if ($url != "/silverstripe_api/api/v1/auth/login" && $url != "/silverstripe_api/api/v1/auth/register") {
+                $getHeaders = apache_request_headers();
+                $token = isset($getHeaders['Authorization']) ? $getHeaders['Authorization'] : "";
+                if (empty($token)) {
+                    $response = [
+                        "status" => [
+                            "code" => 401,
+                            "description" => "Unauthorized",
+                            "message" => [
+                                'Invalid Token'
+                            ]
+                        ]
+                    ];
+                    $this->response->addHeader('Content-Type', 'application/json');
+                    echo json_encode($response);
+                    die;
+                } else {
+                    $bearer = $getHeaders['Authorization'];
+                    $token = substr($bearer, 7);
+
+                    $userLogin = User::get()->filter(['Token' => $token])->first();
+
+                    if (is_null($userLogin)) {
+                        $response = [
+                            "status" => [
+                                "code" => 401,
+                                "description" => "Unauthorized",
+                                "message" => [
+                                    'Invalid Token'
+                                ]
+                            ]
+                        ];
+                        $this->response->addHeader('Content-Type', 'application/json');
+                        echo json_encode($response);
+                        die;
+                    }
+                }
+            }
         }
     }
 }
