@@ -6,7 +6,7 @@ class HargaProduct extends DataObject
 {
     private static $db = [
         'Harga' => 'Double',
-        'TglMulaiBerlaku' => 'Datetime',
+        'TglMulaiBerlaku' => 'Datetime'
 
     ];
 
