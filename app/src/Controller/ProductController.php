@@ -22,7 +22,6 @@ class ProductController extends PageController
     public function index(HTTPRequest $request)
     {
         $dataArray = array();
-
         $product = Product::get()->where('Deleted = 0')->limit(10);
         $dataProduct =  new PaginatedList($product, $this->getRequest());
 

@@ -16,8 +16,11 @@ class WarnaController extends PageController
     public function index(HTTPRequest $request)
     {
         $dataArray = array();
-
-        $warna = Warna::get()->where('Deleted = 0')->limit(10);
+        if (isset($_REQUEST['Status'])) {
+            $warna = Warna::get()->where('Deleted = 0 AND Status = ' . $_REQUEST['Status']);
+        } else {
+            $warna = Warna::get()->where('Deleted = 0')->limit(10);
+        }
         $dataWarna =  new PaginatedList($warna, $this->getRequest());
 
         foreach ($dataWarna as $warna) {
