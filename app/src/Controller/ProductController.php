@@ -11,7 +11,8 @@ class ProductController extends PageController
         'show',
         'update',
         'delete',
-        'updateStokHarga'
+        'updateStokHarga',
+        'historyStok'
     ];
 
     public function index(HTTPRequest $request)
@@ -432,6 +433,87 @@ class ProductController extends PageController
                         ],
                     ];
                 }
+            }
+        }
+
+        $this->response->addHeader('Content-Type', 'application/json');
+        return json_encode($response);
+    }
+
+    public function historyStok(HTTPRequest $request)
+    {
+        // Validate Required Parameter
+        if (!isset($_REQUEST['ProductID']) || !isset($_REQUEST['WarnaProductID'])) {
+            $message = [];
+            if (!isset($_REQUEST['ProductID'])) {
+                array_push($message, 'Parameter ProductID tidak ditemukan.');
+            }
+            if (!isset($_REQUEST['WarnaProductID'])) {
+                array_push($message, 'Parameter WarnaProductID tidak ditemukan.');
+            }
+
+            $response = [
+                "status" => [
+                    "code" => 422,
+                    "description" => "Unprocessable Entity",
+                    "message" => $message
+                ]
+            ];
+        } else {
+            $ProductID = $_REQUEST['ProductID'];
+            $WarnaProductID = $_REQUEST['WarnaProductID'];
+
+            $product = Product::get()->byID($ProductID);
+            $warnaProduct = WarnaProduct::get()->byID($WarnaProductID);
+
+            $dataStokArray = array();
+            $dataHistoryStok = JumlahProduct::get()->where('WarnaProductID = ' . $WarnaProductID)->sort('Created', 'DESC');
+
+            // Validate Data ParameterValid ?
+            if (is_null($product) || is_null($warnaProduct) || is_null($dataHistoryStok)) {
+                $message = [];
+                if (is_null($product)) {
+                    array_push($message, 'Product dengan ID ' . $ProductID . ' tidak ditemukan');
+                }
+                if (is_null($warnaProduct)) {
+                    array_push($message, 'Warna Product dengan ID ' . $WarnaProductID . ' tidak ditemukan');
+                }
+                if (is_null($dataHistoryStok)) {
+                    array_push($message, 'Data history stok dengan WarnaProductID ' . $WarnaProductID . ' tidak ditemukan');
+                }
+                $response = [
+                    "status" => [
+                        "code" => 404,
+                        "description" => "Not Found",
+                        "message" => $message
+                    ]
+                ];
+            } else {
+                foreach ($dataHistoryStok as $stok) {
+                    $temparr = array();
+                    $temparr['Tanggal'] = $stok->Created;
+                    $temparr['JumlahStok'] = $stok->Jumlah;
+                    $dataStokArray[] = $temparr;
+                }
+
+
+                $response = [
+                    "status" => [
+                        "code" => 200,
+                        "description" => "OK",
+                        "message" => [
+                            "Data History Stok Product"
+                        ]
+                    ],
+                    "data" => [
+                        "product" => [
+                            "ID" => $product->ID,
+                            "NamaProduct" => $product->NamaProduct,
+                            "WarnaProduct" => $warnaProduct->Warna()->NamaWarna,
+                        ],
+                        "historyStok" => $dataStokArray
+                    ]
+                ];
             }
         }
 
