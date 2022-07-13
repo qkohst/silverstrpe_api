@@ -1,5 +1,6 @@
 <?php
 
+use SilverStripe\Assets\Upload;
 use SilverStripe\Control\HTTPRequest;
 use SilverStripe\Core\Convert;
 
@@ -52,21 +53,23 @@ class ProductController extends PageController
     {
         $NamaProduct = (isset($_REQUEST['NamaProduct'])) ? $_REQUEST['NamaProduct'] : '';
         $DeskripsiProduct = (isset($_REQUEST['DeskripsiProduct'])) ? $_REQUEST['DeskripsiProduct'] : '';
+        $GambarProduct = (isset($_FILES['GambarProduct'])) ? $_FILES['GambarProduct'] : '';
 
-        // $CountGambar = 0;
-        // if (hash_file($_FILES['GambarProduct'])) {
-        //     $file = $_FILES['GambarProduct'];
-        //     $CountGambar = count($file);
-        // }
-
-        // BELUM 
-
+        // Count data 
         $CountWarna = 0;
-        if (isset($_REQUEST['WarnaProduct'][0])) {
+        $CountJumlah = 0;
+        $CountHarga = 0;
+        if (isset($_REQUEST['WarnaProduct'])) {
             $CountWarna = count($_REQUEST['WarnaProduct']);
         }
+        if (isset($_REQUEST['Jumlah'])) {
+            $CountJumlah = count($_REQUEST['Jumlah']);
+        }
+        if (isset($_REQUEST['Harga'])) {
+            $CountHarga = count($_REQUEST['Harga']);
+        }
 
-        if (trim($NamaProduct) == null || trim($DeskripsiProduct) == null || $CountWarna == 0) {
+        if (trim($NamaProduct) == null || trim($DeskripsiProduct) == null || $CountWarna == 0 || count($GambarProduct['name']) < 2) {
             $message = [];
             if (trim($NamaProduct) == null) {
                 array_push($message, "Nama product tidak boleh kosong");
@@ -74,11 +77,11 @@ class ProductController extends PageController
             if (trim($DeskripsiProduct) == null) {
                 array_push($message, "Deskripsi product tidak boleh kosong");
             }
-            // if ($CountGambar == 0) {
-            //     array_push($message, "Gambar Product tidak boleh kosong");
-            // }
+            if (count($GambarProduct['name']) < 2) {
+                array_push($message, "Gambar product minimal berisi 2 gambar");
+            }
             if ($CountWarna == 0) {
-                array_push($message, "Silahkan pilih warna product kemudian isikan jumlah & harga");
+                array_push($message, "Warna product tidak boleh kosong");
             }
             $response = [
                 "status" => [
@@ -87,8 +90,114 @@ class ProductController extends PageController
                     "message" => $message
                 ]
             ];
+        } elseif ($CountWarna == $CountJumlah && $CountWarna == $CountHarga) {
+            // Validate data warna valid ?
+            $messageWarna = [];
+            for ($i = 0; $i < $CountWarna; $i++) {
+                $checkWarna = Warna::get()->where('Deleted = 0 AND ID = ' . $_REQUEST['WarnaProduct'][$i])->first();
+                if (is_null($checkWarna)) {
+                    array_push($messageWarna, 'ID Warna index ke ' . $i . ' tidak ditemukan');
+                }
+            }
+            if (count($messageWarna) != 0) {
+                $response = [
+                    "status" => [
+                        "code" => 422,
+                        "description" => "Unprocessable Entity",
+                        "message" => $messageWarna
+                    ]
+                ];
+            } else {
+                // Save Data Product
+                $product = Product::create();
+                $product->NamaProduct = Convert::raw2sql($_REQUEST['NamaProduct']);
+                $product->DeskripsiProduct = $_REQUEST['DeskripsiProduct'];
+                $product->Status = 1;
+                $product->write();
+
+                // Upload gambar
+
+                $images = [];
+                for ($j = 0; $j < count($GambarProduct['name']); $j++) {
+                    array_push($images, [
+                        'name' => $GambarProduct['name'][$j],
+                        'type' => $GambarProduct['type'][$j],
+                        'tmp_name' => $GambarProduct['tmp_name'][$j],
+                        'error' => $GambarProduct['error'][$j],
+                        'size' => $GambarProduct['size'][$j],
+                    ]);
+                }
+
+                foreach ($images as $img => $file) {
+                    if ($file['name'] != '') {
+                        $name = $file['name'];
+                        $type = $file['type'];
+                        $type = explode('/', $type);
+                        $type = end($type);
+                        if ($type) {
+                            $file['name'] = $product->ID . '-' . $img . '-' . date('Y-m-d-H-i-s') . '.' . $type;
+                        }
+
+                        $upload = new Upload();
+                        $gambarProduct = new Gambar();
+                        $gambarProduct->NamaGambar = $product->ID . '-' . $img . '-' . date('Y-m-d-H-i-s') . '.' . $type;
+                        $gambarProduct->ProductID = $product->ID;
+
+                        $upload->loadIntoFile($file, $gambarProduct, 'GambarProduct');
+                        $gambarProduct->write();
+                    }
+                }
+
+                // Save Warna Product, Jumlah Product, & Harga
+                for ($i = 0; $i < count($_REQUEST['WarnaProduct']); $i++) {
+
+                    // Warna Product 
+                    $warnaProduct = WarnaProduct::create();
+                    $warnaProduct->WarnaID = Convert::raw2sql($_REQUEST['WarnaProduct'][$i]);
+                    $warnaProduct->ProductID = $product->ID;
+                    $warnaProduct->write();
+
+                    // Jumlah Product
+                    $jumlahProduct = JumlahProduct::create();
+                    $jumlahProduct->Jumlah = Convert::raw2sql($_REQUEST['Jumlah'][$i]);
+                    $jumlahProduct->WarnaProductID = $warnaProduct->ID;
+                    $jumlahProduct->write();
+
+                    // Harga Product
+                    $hargaProduct = HargaProduct::create();
+                    $hargaProduct->Harga = str_replace(".", "", Convert::raw2sql($_REQUEST['Harga'][$i]));
+                    $hargaProduct->WarnaProductID = $warnaProduct->ID;
+                    $hargaProduct->write();
+                }
+
+                $response = [
+                    "status" => [
+                        "code" => 200,
+                        "description" => "OK",
+                        "message" => [
+                            "Berhasil disimpan"
+                        ]
+                    ],
+                ];
+            }
         } else {
-            // 
+            // Validate Warna, Jumlah & Harga Sama  
+            $message = [];
+            for ($i = 0; $i < $CountWarna; $i++) {
+                if (!isset($_REQUEST['Jumlah'][$i])) {
+                    array_push($message, "Jumlah pada warna index ke " . $i . " tidak ditemukan");
+                }
+                if (!isset($_REQUEST['Harga'][$i])) {
+                    array_push($message, "Harga pada warna index ke " . $i . " tidak ditemukan");
+                }
+            }
+            $response = [
+                "status" => [
+                    "code" => 422,
+                    "description" => "Unprocessable Entity",
+                    "message" => $message
+                ]
+            ];
         }
 
         $this->response->addHeader('Content-Type', 'application/json');

@@ -11,11 +11,6 @@ class WarnaController extends PageController
         'update',
         'delete'
     ];
-    
-    public function init()
-    {
-        parent::init();
-    }
 
     public function index(HTTPRequest $request)
     {
