@@ -4,6 +4,7 @@ use SilverStripe\Assets\Upload;
 use SilverStripe\Control\HTTPRequest;
 use SilverStripe\Core\Convert;
 use SilverStripe\ORM\DB;
+use SilverStripe\ORM\PaginatedList;
 
 class ProductController extends PageController
 {
@@ -22,7 +23,8 @@ class ProductController extends PageController
     {
         $dataArray = array();
 
-        $dataProduct = Product::get()->where('Deleted = 0');
+        $product = Product::get()->where('Deleted = 0')->limit(10);
+        $dataProduct =  new PaginatedList($product, $this->getRequest());
 
         foreach ($dataProduct as $product) {
             $gambar = Gambar::get()->where('ProductID = ' . $product->ID)->first();
@@ -248,6 +250,7 @@ class ProductController extends PageController
                 $temparr['Warna'] = $warnaProduct->Warna->NamaWarna;
                 $temparr['Stok'] = $stok->Jumlah;
                 $temparr['Harga'] = $hargaAktif->Harga;
+                $temparr['TglMulaiBerlaku'] = $hargaAktif->TglMulaiBerlaku;
 
                 $dataPilihanProductArray[] = $temparr;
             }

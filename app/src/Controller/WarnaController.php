@@ -2,6 +2,7 @@
 
 use SilverStripe\Control\HTTPRequest;
 use SilverStripe\Core\Convert;
+use SilverStripe\ORM\PaginatedList;
 
 class WarnaController extends PageController
 {
@@ -16,7 +17,8 @@ class WarnaController extends PageController
     {
         $dataArray = array();
 
-        $dataWarna = Warna::get()->where('Deleted = 0');
+        $warna = Warna::get()->where('Deleted = 0')->limit(10);
+        $dataWarna =  new PaginatedList($warna, $this->getRequest());
 
         foreach ($dataWarna as $warna) {
             $temparr = array();
