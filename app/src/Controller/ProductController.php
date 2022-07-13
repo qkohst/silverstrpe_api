@@ -14,7 +14,8 @@ class ProductController extends PageController
         'delete',
         'showStokHarga',
         'updateStokHarga',
-        'historyStok'
+        'historyStok',
+        'historyHarga'
     ];
 
     public function index(HTTPRequest $request)
@@ -564,6 +565,93 @@ class ProductController extends PageController
                             "WarnaProduct" => $warnaProduct->Warna()->NamaWarna,
                         ],
                         "historyStok" => $dataStokArray
+                    ]
+                ];
+            }
+        }
+
+        $this->response->addHeader('Content-Type', 'application/json');
+        return json_encode($response);
+    }
+
+    public function historyHarga(HTTPRequest $request)
+    {
+        // Validate Required Parameter
+        if (!isset($_REQUEST['ProductID']) || !isset($_REQUEST['WarnaProductID'])) {
+            $message = [];
+            if (!isset($_REQUEST['ProductID'])) {
+                array_push($message, 'Parameter ProductID tidak ditemukan.');
+            }
+            if (!isset($_REQUEST['WarnaProductID'])) {
+                array_push($message, 'Parameter WarnaProductID tidak ditemukan.');
+            }
+
+            $response = [
+                "status" => [
+                    "code" => 422,
+                    "description" => "Unprocessable Entity",
+                    "message" => $message
+                ]
+            ];
+        } else {
+            $ProductID = $_REQUEST['ProductID'];
+            $WarnaProductID = $_REQUEST['WarnaProductID'];
+
+            $product = Product::get()->byID($ProductID);
+            $warnaProduct = WarnaProduct::get()->byID($WarnaProductID);
+
+            $dataHargaArray = array();
+            $dataHistoryHarga = HargaProduct::get()->where('WarnaProductID = ' . $WarnaProductID)->sort('Created', 'DESC');
+            // Validate Data ParameterValid ?
+            if (is_null($product) || is_null($warnaProduct) || is_null($dataHistoryHarga)) {
+                $message = [];
+                if (is_null($product)) {
+                    array_push($message, 'Product dengan ID ' . $ProductID . ' tidak ditemukan');
+                }
+                if (is_null($warnaProduct)) {
+                    array_push($message, 'Warna Product dengan ID ' . $WarnaProductID . ' tidak ditemukan');
+                }
+                if (is_null($dataHistoryHarga)) {
+                    array_push($message, 'Data history harga dengan WarnaProductID ' . $WarnaProductID . ' tidak ditemukan');
+                }
+                $response = [
+                    "status" => [
+                        "code" => 404,
+                        "description" => "Not Found",
+                        "message" => $message
+                    ]
+                ];
+            } else {
+                $hargaAktif = HargaProduct::get()->where("WarnaProductID = " . $warnaProduct->ID . " AND TglMulaiBerlaku <= '" . date("Y-m-d H:i:s") . "'")->last();
+
+                foreach ($dataHistoryHarga as $harga) {
+                    $temparr = array();
+                    $temparr['Harga'] = $harga->Harga;
+                    if ($hargaAktif->ID == $harga->ID) {
+                        $temparr['Status'] = "Aktif";
+                    } else {
+                        $temparr['Status'] = "Non Aktif";
+                    }
+                    $temparr['TglMulaiBerlaku'] = $harga->TglMulaiBerlaku;
+
+                    $dataHargaArray[] = $temparr;
+                }
+
+                $response = [
+                    "status" => [
+                        "code" => 200,
+                        "description" => "OK",
+                        "message" => [
+                            "Data History Harga Product"
+                        ]
+                    ],
+                    "data" => [
+                        "product" => [
+                            "ID" => $product->ID,
+                            "NamaProduct" => $product->NamaProduct,
+                            "WarnaProduct" => $warnaProduct->Warna()->NamaWarna,
+                        ],
+                        "historyHarga" => $dataHargaArray
                     ]
                 ];
             }
