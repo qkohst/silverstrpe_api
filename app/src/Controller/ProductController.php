@@ -16,12 +16,14 @@ class ProductController extends PageController
         'showStokHarga',
         'updateStokHarga',
         'historyStok',
-        'historyHarga'
+        'historyHarga',
+        'search'
     ];
 
     public function index(HTTPRequest $request)
     {
         $dataArray = array();
+
         $product = Product::get()->where('Deleted = 0')->limit(10);
         $dataProduct =  new PaginatedList($product, $this->getRequest());
 
@@ -35,6 +37,23 @@ class ProductController extends PageController
                 "NamaGambar" => $gambar->NamaGambar,
                 "URL" => "/public/assets/GambarProduct/" . $gambar->NamaGambar,
             ];
+            $temparr['PilihanProduct'] = [];
+
+            // Looping Warna Product 
+            $dataPilihanProduct = WarnaProduct::get()->where('ProductID = ' . $product->ID);
+            foreach ($dataPilihanProduct as $warnaProduct) {
+                $stok = JumlahProduct::get()->where('WarnaProductID = ' . $warnaProduct->ID)->last();
+                $hargaAktif = HargaProduct::get()->where("WarnaProductID = " . $warnaProduct->ID . " AND TglMulaiBerlaku <= '" . date("Y-m-d H:i:s") . "'")->last();
+
+                $pil = array();
+                $pil['ID'] = $warnaProduct->ID;
+                $pil['Warna'] = $warnaProduct->Warna->NamaWarna;
+                $pil['Stok'] = $stok->Jumlah;
+                $pil['Harga'] = $hargaAktif->Harga;
+                $pil['TglMulaiBerlaku'] = $hargaAktif->TglMulaiBerlaku;
+
+                $temparr['PilihanProduct'][] = $pil;
+            }
 
             $dataArray[] = $temparr;
         }
@@ -657,6 +676,98 @@ class ProductController extends PageController
                     ]
                 ];
             }
+        }
+
+        $this->response->addHeader('Content-Type', 'application/json');
+        return json_encode($response);
+    }
+
+    public function search(HTTPRequest $request)
+    {
+        // $keyword = $_REQUEST['keyword'];
+        $datas = $request->requestVars();
+
+        $productDetail = Product::get()->where('Deleted = 0');
+
+        if (isset($datas['keyword'])) {
+            $query = $datas['keyword'];
+            $query = str_replace('-', '', $query);
+            $query = Convert::raw2sql($query);
+
+            // $where = "(upper(Product.NamaProduct) LIKE '%" . strtoupper($query) . "%' OR upper(Warna.NamaWarna) LIKE '%" . strtoupper($query) . "%')";
+
+            // $where = "(upper(concat('.', Product.NamaProduct, '.', Warna.NamaWarna)) LIKE '%" . strtoupper($query) . "%')";
+            // $sql = "SELECT Product.ID, NamaProduct
+            // FROM Product
+            // LEFT JOIN WarnaProduct ON Product.ID = WarnaProduct.ProductID
+            // LEFT JOIN Warna ON WarnaProduct.WarnaID = Warna.ID
+            // WHERE {$where}";
+
+            $sql = "SELECT Product.*, Product.ID AS PID 
+            FROM Product 
+            INNER JOIN WarnaProduct 
+            ON Product.ID = WarnaProduct.ProductID 
+            INNER JOIN Warna 
+            ON WarnaProduct.WarnaID = Warna.ID 
+            WHERE CONCAT_WS(Product.NamaProduct,'-',Warna.NamaWarna) LIKE '%" . strtoupper($query) . "%'
+            GROUP BY Product.ID ORDER BY Product.Created DESC ";
+
+            $productDetail = DB::query($sql);
+
+            // print_r($productDetail->numRecords());
+            // die;
+            if ($productDetail->numRecords() > 0) {
+                $temp_results = [];
+                foreach ($productDetail as $product) {
+                    $prod = Product::get()->byID($product['ID']);
+                    $warnaProduct = $prod->WarnaProduct();
+
+                    $temp_warna = [];
+                    foreach ($warnaProduct as $warna) {
+                        $temp_warna[] = [
+                            'NamaWarna' => $warna->Warna()->NamaWarna
+                        ];
+                    }
+
+                    $temp_results[] = [
+                        'ID' => $prod->ID,
+                        'NamaProduct' => $prod->NamaProduct,
+                        'PilihanProduct' => $temp_warna,
+                    ];
+                }
+
+                $response = [
+                    "status" => [
+                        "code" => 200,
+                        "description" => "OK",
+                        "message" => [
+                            'Hasil pencarian untuk ' . $query
+                        ]
+                    ],
+                    "data" => $temp_results
+
+                ];
+            } else {
+                $response = [
+                    "status" => [
+                        "code" => 404,
+                        "description" => "Not Found",
+                        "message" => [
+                            'Pencarian dengan keyword ' . $query . ' tidak ditemukan'
+                        ]
+                    ]
+                ];
+            }
+        } else {
+            $response = [
+                "status" => [
+                    "code" => 404,
+                    "description" => "Not Found",
+                    "message" => [
+                        'Pencarian tidak ditemukan'
+                    ]
+                ]
+            ];
         }
 
         $this->response->addHeader('Content-Type', 'application/json');
