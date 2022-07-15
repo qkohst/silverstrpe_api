@@ -17,7 +17,8 @@ class ProductController extends PageController
         'updateStokHarga',
         'historyStok',
         'historyHarga',
-        'search'
+        'search',
+        'suggest'
     ];
 
     public function index(HTTPRequest $request)
@@ -684,7 +685,6 @@ class ProductController extends PageController
 
     public function search(HTTPRequest $request)
     {
-        // $keyword = $_REQUEST['keyword'];
         $datas = $request->requestVars();
 
         $productDetail = Product::get()->where('Deleted = 0');
@@ -693,15 +693,6 @@ class ProductController extends PageController
             $query = $datas['keyword'];
             $query = str_replace('-', '', $query);
             $query = Convert::raw2sql($query);
-
-            // $where = "(upper(Product.NamaProduct) LIKE '%" . strtoupper($query) . "%' OR upper(Warna.NamaWarna) LIKE '%" . strtoupper($query) . "%')";
-
-            // $where = "(upper(concat('.', Product.NamaProduct, '.', Warna.NamaWarna)) LIKE '%" . strtoupper($query) . "%')";
-            // $sql = "SELECT Product.ID, NamaProduct
-            // FROM Product
-            // LEFT JOIN WarnaProduct ON Product.ID = WarnaProduct.ProductID
-            // LEFT JOIN Warna ON WarnaProduct.WarnaID = Warna.ID
-            // WHERE {$where}";
 
             $sql = "SELECT Product.*, Product.ID AS PID 
             FROM Product 
@@ -714,14 +705,13 @@ class ProductController extends PageController
 
             $productDetail = DB::query($sql);
 
-            // print_r($productDetail->numRecords());
-            // die;
             if ($productDetail->numRecords() > 0) {
                 $temp_results = [];
                 foreach ($productDetail as $product) {
                     $prod = Product::get()->byID($product['ID']);
                     $warnaProduct = $prod->WarnaProduct();
 
+                    // Looping warna product
                     $temp_warna = [];
                     foreach ($warnaProduct as $warna) {
                         $temp_warna[] = [
@@ -765,6 +755,68 @@ class ProductController extends PageController
                     "description" => "Not Found",
                     "message" => [
                         'Pencarian tidak ditemukan'
+                    ]
+                ]
+            ];
+        }
+
+        $this->response->addHeader('Content-Type', 'application/json');
+        return json_encode($response);
+    }
+
+    public function suggest(HTTPRequest $request)
+    {
+        $datas = $request->requestVars();
+        $dataProduct = Product::get()->where('Deleted = 0');
+
+        if (isset($datas['keyword'])) {
+            $query = $datas['keyword'];
+            $query = Convert::raw2sql($query);
+
+            // My Code 
+
+            // $sql = "SELECT NamaProduct, DeskripsiProduct 
+            // FROM Product
+            // WHERE NamaProduct LIKE '%" . strtoupper($query) . "%'
+            // OR DeskripsiProduct LIKE '%" . strtoupper($query) . "%'";
+
+
+            // Code Mas Fian 
+
+            $sql = "SELECT nama FROM
+            (SELECT NamaProduct as nama 
+            FROM Product 
+            WHERE NamaProduct LIKE '%" . strtoupper($query) . "%'
+            UNION ALL 
+            SELECT DeskripsiProduct as nama 
+            FROM Product
+            WHERE DeskripsiProduct LIKE '%" . strtoupper($query) . "%' )
+            tablenya group by nama";
+
+            $dataProduct = DB::query($sql);
+
+            $datasuggest = [];
+            foreach ($dataProduct as $product) {
+                array_push($datasuggest, $product['nama']);
+            }
+
+            $response = [
+                "status" => [
+                    "code" => 200,
+                    "description" => "OK",
+                    "message" => [
+                        'Suggestion untuk ' . $query
+                    ]
+                ],
+                "data" => $datasuggest
+            ];
+        } else {
+            $response = [
+                "status" => [
+                    "code" => 404,
+                    "description" => "Not Found",
+                    "message" => [
+                        'Suggestion tidak ditemukan'
                     ]
                 ]
             ];
