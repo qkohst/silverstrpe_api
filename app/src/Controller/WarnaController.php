@@ -2,7 +2,7 @@
 
 use SilverStripe\Control\HTTPRequest;
 use SilverStripe\Core\Convert;
-use SilverStripe\ORM\PaginatedList;
+use SilverStripe\ORM\DB;
 
 class WarnaController extends PageController
 {
@@ -15,13 +15,31 @@ class WarnaController extends PageController
 
     public function index(HTTPRequest $request)
     {
-        $dataArray = array();
-        if (isset($_REQUEST['Status'])) {
-            $warna = Warna::get()->where('Deleted = 0 AND Status = ' . $_REQUEST['Status']);
+        // Check Parameter Request 
+
+        if (isset($_REQUEST['pages'])) {
+            $page = $_REQUEST['pages'];
         } else {
-            $warna = Warna::get()->where('Deleted = 0')->limit(10);
+            $page = 1;
         }
-        $dataWarna =  new PaginatedList($warna, $this->getRequest());
+
+        if (isset($_REQUEST['limit'])) {
+            $limit = $_REQUEST['limit'];
+        } else {
+            $limit = 10;
+        }
+        $offset = ($page - 1) * $limit;
+
+
+        $dataArray = array();
+        if (isset($_REQUEST['status'])) {
+            $dataWarna = Warna::get()->where('Deleted = 0 AND Status = ' . $_REQUEST['status']);
+        } else {
+            $dataWarna = Warna::get()->where('Deleted = 0');
+        }
+        
+        $total_records = $dataWarna->count();
+        $dataWarna = $dataWarna->limit($limit, $offset);
 
         foreach ($dataWarna as $warna) {
             $temparr = array();
@@ -39,7 +57,12 @@ class WarnaController extends PageController
                     "List Warna"
                 ],
             ],
-            "data" => $dataArray
+            "data" => [
+                'pages' => $page,
+                'limit' => $limit,
+                'total_records' => $total_records,
+                'records' => $dataArray
+            ]
         ];
 
         $this->response->addHeader('Content-Type', 'application/json');

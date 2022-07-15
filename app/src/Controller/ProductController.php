@@ -23,10 +23,28 @@ class ProductController extends PageController
 
     public function index(HTTPRequest $request)
     {
+        // Check Parameter Request 
+
+        if (isset($_REQUEST['pages'])) {
+            $page = $_REQUEST['pages'];
+        } else {
+            $page = 1;
+        }
+
+        if (isset($_REQUEST['limit'])) {
+            $limit = $_REQUEST['limit'];
+        } else {
+            $limit = 10;
+        }
+        $offset = ($page - 1) * $limit;
+
+        // 
+
         $dataArray = array();
 
-        $product = Product::get()->where('Deleted = 0')->limit(10);
-        $dataProduct =  new PaginatedList($product, $this->getRequest());
+        $dataProduct = Product::get()->where('Deleted = 0');
+        $total_records = $dataProduct->count();
+        $dataProduct = $dataProduct->limit($limit, $offset);
 
         foreach ($dataProduct as $product) {
             $gambar = Gambar::get()->where('ProductID = ' . $product->ID)->first();
@@ -67,7 +85,12 @@ class ProductController extends PageController
                     "List Product"
                 ],
             ],
-            "data" => $dataArray
+            "data" => [
+                'pages' => $page,
+                'limit' => $limit,
+                'total_records' => $total_records,
+                'records' => $dataArray
+            ]
         ];
 
         $this->response->addHeader('Content-Type', 'application/json');
@@ -192,6 +215,7 @@ class ProductController extends PageController
                     $hargaProduct = HargaProduct::create();
                     $hargaProduct->Harga = str_replace(".", "", Convert::raw2sql($_REQUEST['Harga'][$i]));
                     $hargaProduct->WarnaProductID = $warnaProduct->ID;
+                    $hargaProduct->TglMulaiBerlaku = date('Y-m-d H:i:s');
                     $hargaProduct->write();
                 }
 
