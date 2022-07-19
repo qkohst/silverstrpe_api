@@ -8,100 +8,12 @@ class PembelianProductController extends ProductController
 {
     private static $allowed_actions = [
         'buy',
-        'getNewKode'
+        'getNewKode',
+        'graphic'
     ];
 
     public function buy(HTTPRequest $request)
     {
-        // print_r($this->getNewKode());
-        // die;
-        // // Count data 
-        // $CountProduct = 0;
-        // $CountJumlahBeli = 0;
-        // if (isset($_REQUEST['WarnaProductID'])) {
-        //     $CountProduct = count($_REQUEST['WarnaProductID']);
-        // }
-        // if (isset($_REQUEST['JumlahBeli'])) {
-        //     $CountJumlahBeli = count($_REQUEST['JumlahBeli']);
-        // }
-
-        // // Check Validate Parameter 
-        // if ($CountProduct == 0 || $CountJumlahBeli == 0 || $CountProduct != $CountJumlahBeli) {
-        //     $message = [];
-        //     if ($CountProduct == 0) {
-        //         array_push($message, 'WarnaProductID tidak boleh kosong');
-        //     }
-        //     if ($CountJumlahBeli == 0) {
-        //         array_push($message, 'JumlahBeli tidak boleh kosong');
-        //     }
-        //     if ($CountProduct != $CountJumlahBeli) {
-        //         array_push($message, 'JumlahBeli dan WarnaProductID yang anda beli tidak valid.');
-        //     }
-
-        //     $response = [
-        //         "status" => [
-        //             "code" => 422,
-        //             "description" => "Unprocessable Entity",
-        //             "message" => $message
-        //         ]
-        //     ];
-        // } elseif ($CountProduct == $CountJumlahBeli) {
-        //     // Validate  WarnaProductID Exist & Stok
-        //     $messageError = [];
-        //     for ($i = 0; $i < $CountProduct; $i++) {
-        //         $stokProduct = JumlahProduct::get()->where('WarnaProductID = ' . $_REQUEST['WarnaProductID'][$i])->last();
-        //         if ($stokProduct == null) {
-        //             array_push($messageError, 'Product dengan WarnaProductID ' . $_REQUEST['WarnaProductID'][$i] . ' tidak tersedia');
-        //         } elseif ($stokProduct->Jumlah < $_REQUEST['JumlahBeli'][$i]) {
-        //             array_push($messageError, 'Sisa stok untuk product dengan WarnaProductID ' . $_REQUEST['WarnaProductID'][$i] . ' tidak mencukupi');
-        //         }
-        //     }
-        //     if (count($messageError) != 0) {
-        //         $response = [
-        //             "status" => [
-        //                 "code" => 422,
-        //                 "description" => "Unprocessable Entity",
-        //                 "message" => $messageError
-        //             ]
-        //         ];
-        //     } elseif (count($messageError) == 0) {
-        //         // Save data pembelian
-        //         $pembelian = Pembelian::create();
-        //         $pembelian->Kode = $this->getNewKode();
-        //         $pembelian->UserID = $this->getUserLogin()->ID;
-        //         $pembelian->write();
-
-        //         for ($i = 0; $i < $CountProduct; $i++) {
-        //             $stokProduct = JumlahProduct::get()->where('WarnaProductID = ' . $_REQUEST['WarnaProductID'][$i])->last();
-        //             $hargaProduct = HargaProduct::get()->where("WarnaProductID = " . $_REQUEST['WarnaProductID'][$i] . " AND TglMulaiBerlaku <= '" . date("Y-m-d H:i:s") . "'")->last();
-
-        //             // Save Pembelian Product 
-        //             $pembelianProduct = PembelianProduct::create();
-        //             $pembelianProduct->PembelianID = $pembelian->ID;
-        //             $pembelianProduct->WarnaProductID = $_REQUEST['WarnaProductID'][$i];
-        //             $pembelianProduct->JumlahBeli = $_REQUEST['JumlahBeli'][$i];
-        //             $pembelianProduct->HargaBeli = $hargaProduct->Harga;
-        //             $pembelianProduct->write();
-
-        //             // Update Stok Product 
-        //             $jumlahProduct = JumlahProduct::create();
-        //             $jumlahProduct->Jumlah = ($stokProduct->Jumlah - $_REQUEST['JumlahBeli'][$i]);
-        //             $jumlahProduct->WarnaProductID = $_REQUEST['WarnaProductID'][$i];
-        //             $jumlahProduct->write();
-        //         }
-
-        //         $response = [
-        //             "status" => [
-        //                 "code" => 200,
-        //                 "description" => "OK",
-        //                 "message" => [
-        //                     'Berhasil disimpan'
-        //                 ]
-        //             ]
-        //         ];
-        //     }
-        // }
-
         $values = json_decode($_REQUEST['data']);
 
         $messageError = [];
@@ -195,5 +107,84 @@ class PembelianProductController extends ProductController
 
         $newKode = 'PE/' . date("m/Y/") . sprintf("%05s", $nomorUrut);
         return $newKode;
+    }
+
+    public function graphic(HTTPRequest $request)
+    {
+        // Check Parameter Request 
+        if (isset($_REQUEST['tahun'])) {
+            $tahun = $_REQUEST['tahun'];
+        } else {
+            $tahun = date('Y');
+        }
+        $dataPenjualan = Pembelian::get();
+
+        if (!isset($_REQUEST['bulan'])) {
+            // Graphic berdasarkan tahun 
+            $sql = "SELECT COUNT(ID) as jumlah, DATE_FORMAT(Created, '%M') AS bulan
+                    FROM Pembelian 
+                    WHERE DATE_FORMAT(Created, '%Y') = " . $tahun . "
+                    GROUP BY YEAR(Created), MONTH(Created)";
+
+            $dataPenjualan = DB::query($sql);
+
+            $result = [];
+            foreach ($dataPenjualan as $penjualan) {
+                $result[] = [
+                    'Bulan' => $penjualan['bulan'],
+                    'TotalPenjualan' => $penjualan['jumlah']
+                ];
+            }
+
+            $response = [
+                "status" => [
+                    "code" => 200,
+                    "description" => "OK",
+                    "message" => [
+                        'Grafik penjualan tahun ' . $tahun
+                    ]
+                ],
+                "data" => [
+                    "tahun" => $tahun,
+                    "result" => $result
+                ]
+            ];
+        } elseif (isset($_REQUEST['bulan'])) {
+            // Graphic berdasarkan bulan
+            $bulan = $_REQUEST['bulan'];
+
+            $sql = "SELECT COUNT(ID) as jumlah, DATE_FORMAT(Created, '%d') AS tanggal
+            FROM Pembelian 
+            WHERE DATE_FORMAT(Created, '%Y') = " . $tahun . " 
+            AND DATE_FORMAT(Created, '%m') = " . $bulan . " 
+            GROUP BY MONTH(Created), DAY(Created)";
+
+            $dataPenjualan = DB::query($sql);
+
+            $result = [];
+            foreach ($dataPenjualan as $penjualan) {
+                $result[] = [
+                    'Tanggal' => $penjualan['tanggal'],
+                    'TotalPenjualan' => $penjualan['jumlah']
+                ];
+            }
+
+            $response = [
+                "status" => [
+                    "code" => 200,
+                    "description" => "OK",
+                    "message" => [
+                        'Grafik penjualan tahun ' . $tahun . ' bulan ' . $bulan
+                    ]
+                ],
+                "data" => [
+                    "bulan" => $bulan,
+                    "result" => $result
+                ]
+            ];
+        }
+
+        $this->response->addHeader('Content-Type', 'application/json');
+        return json_encode($response);
     }
 }

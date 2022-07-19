@@ -47,7 +47,6 @@ class ProductController extends PageController
         $offset = ($page - 1) * $limit;
 
         // 
-
         $dataArray = array();
 
         $dataProduct = Product::get()->where('Deleted = 0');
@@ -874,7 +873,7 @@ class ProductController extends PageController
             SELECT DeskripsiProduct as nama 
             FROM Product
             WHERE DeskripsiProduct LIKE '%" . strtoupper($query) . "%' )
-            tablenya group by nama";
+            tablenya GROUP BY nama";
 
             $dataProduct = DB::query($sql);
 
@@ -907,10 +906,5 @@ class ProductController extends PageController
 
         $this->response->addHeader('Content-Type', 'application/json');
         return json_encode($response);
-    }
-
-    public function buy(HTTPRequest $request)
-    {
-        // 
     }
 }

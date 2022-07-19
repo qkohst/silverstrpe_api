@@ -5,7 +5,7 @@ use SilverStripe\ORM\DataObject;
 class Pembelian extends DataObject
 {
     private static $db = [
-        'Kode' => 'Varchar(20)',
+        'Kode' => 'Varchar(16)',
     ];
 
     private static $has_one = [
