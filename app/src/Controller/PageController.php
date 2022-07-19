@@ -25,7 +25,9 @@ namespace {
          *
          * @var array
          */
-        private static $allowed_actions = [];
+        private static $allowed_actions = [
+            'getUserLogin'
+        ];
 
 
         protected function init()
@@ -95,6 +97,16 @@ namespace {
                     }
                 }
             }
+        }
+
+        public function getUserLogin()
+        {
+            $getHeaders = apache_request_headers();
+            $bearer = $getHeaders['Authorization'];
+            $token = substr($bearer, 7);
+
+            $userLogin = User::get()->filter(['Token' => $token])->first();
+            return $userLogin;
         }
     }
 }

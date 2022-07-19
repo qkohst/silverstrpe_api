@@ -9,5 +9,14 @@ class User extends DataObject
         'Email' => 'Varchar(45)',
         'Password' => 'Varchar',
         'Token' => 'Varchar(45)',
+        'Role' => 'Int'
+    ];
+
+    // Role 
+    // 1 = Admin 
+    // 2 = Member
+
+    private static $has_many = [
+        'Pembelian' => Pembelian::class,
     ];
 }

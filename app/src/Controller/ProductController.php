@@ -9,17 +9,25 @@ use SilverStripe\ORM\PaginatedList;
 class ProductController extends PageController
 {
     private static $allowed_actions = [
+        'getHargaAktif',
         'store',
         'show',
         'update',
         'delete',
         'showStokHarga',
-        'updateStokHarga',
-        'historyStok',
+        'updateHarga',
         'historyHarga',
+        'updateStok',
+        'historyStok',
         'search',
-        'suggest'
+        'suggest',
     ];
+
+    private function getHargaAktif($id)
+    {
+        $hargaAktif = HargaProduct::get()->where("WarnaProductID = " . $id . " AND TglMulaiBerlaku <= '" . date("Y-m-d H:i:s") . "'")->last();
+        return $hargaAktif;
+    }
 
     public function index(HTTPRequest $request)
     {
@@ -61,13 +69,12 @@ class ProductController extends PageController
             // Looping Warna Product 
             $dataPilihanProduct = WarnaProduct::get()->where('ProductID = ' . $product->ID);
             foreach ($dataPilihanProduct as $warnaProduct) {
-                $stok = JumlahProduct::get()->where('WarnaProductID = ' . $warnaProduct->ID)->last();
-                $hargaAktif = HargaProduct::get()->where("WarnaProductID = " . $warnaProduct->ID . " AND TglMulaiBerlaku <= '" . date("Y-m-d H:i:s") . "'")->last();
+                $hargaAktif = $this->getHargaAktif($warnaProduct->ID);
 
                 $pil = array();
                 $pil['ID'] = $warnaProduct->ID;
                 $pil['Warna'] = $warnaProduct->Warna->NamaWarna;
-                $pil['Stok'] = $stok->Jumlah;
+                $pil['Stok'] = $warnaProduct->Stok;
                 $pil['Harga'] = $hargaAktif->Harga;
                 $pil['TglMulaiBerlaku'] = $hargaAktif->TglMulaiBerlaku;
 
@@ -164,7 +171,6 @@ class ProductController extends PageController
                 $product->write();
 
                 // Upload gambar
-
                 $images = [];
                 for ($j = 0; $j < count($GambarProduct['name']); $j++) {
                     array_push($images, [
@@ -203,13 +209,8 @@ class ProductController extends PageController
                     $warnaProduct = WarnaProduct::create();
                     $warnaProduct->WarnaID = Convert::raw2sql($_REQUEST['WarnaProduct'][$i]);
                     $warnaProduct->ProductID = $product->ID;
+                    $warnaProduct->Stok = Convert::raw2sql($_REQUEST['Jumlah'][$i]);
                     $warnaProduct->write();
-
-                    // Jumlah Product
-                    $jumlahProduct = JumlahProduct::create();
-                    $jumlahProduct->Jumlah = Convert::raw2sql($_REQUEST['Jumlah'][$i]);
-                    $jumlahProduct->WarnaProductID = $warnaProduct->ID;
-                    $jumlahProduct->write();
 
                     // Harga Product
                     $hargaProduct = HargaProduct::create();
@@ -285,13 +286,12 @@ class ProductController extends PageController
             // Looping Warna Product 
             $dataPilihanProduct = WarnaProduct::get()->where('ProductID = ' . $product->ID);
             foreach ($dataPilihanProduct as $warnaProduct) {
-                $stok = JumlahProduct::get()->where('WarnaProductID = ' . $warnaProduct->ID)->last();
-                $hargaAktif = HargaProduct::get()->where("WarnaProductID = " . $warnaProduct->ID . " AND TglMulaiBerlaku <= '" . date("Y-m-d H:i:s") . "'")->last();
+                $hargaAktif = $this->getHargaAktif($warnaProduct->ID);
 
                 $temparr = array();
                 $temparr['ID'] = $warnaProduct->ID;
                 $temparr['Warna'] = $warnaProduct->Warna->NamaWarna;
-                $temparr['Stok'] = $stok->Jumlah;
+                $temparr['Stok'] = $warnaProduct->Stok;
                 $temparr['Harga'] = $hargaAktif->Harga;
                 $temparr['TglMulaiBerlaku'] = $hargaAktif->TglMulaiBerlaku;
 
@@ -428,11 +428,7 @@ class ProductController extends PageController
                 ]
             ];
         } else {
-
-            $jumlahProductTerakhir = JumlahProduct::get()->where('WarnaProductID = ' . $warnaProduct->ID)->last();
-
-            $hargaAktif = HargaProduct::get()->where("WarnaProductID = " . $warnaProduct->ID . " AND TglMulaiBerlaku <= '" . date("Y-m-d H:i:s") . "'")->last();
-
+            $hargaAktif = $this->getHargaAktif($warnaProduct->ID);
             $response = [
                 "status" => [
                     "code" => 200,
@@ -442,10 +438,10 @@ class ProductController extends PageController
                     ]
                 ],
                 "data" => [
-                    "ID" => "a",
+                    "ID" => $warnaProduct->ID,
                     "NamaProduct" => $warnaProduct->Product()->NamaProduct,
                     "WarnaProduct" => $warnaProduct->Warna()->NamaWarna,
-                    "JumlahStok" => $jumlahProductTerakhir->Jumlah,
+                    "JumlahStok" => $warnaProduct->Stok,
                     "Harga" => $hargaAktif->Harga,
                 ]
             ];
@@ -455,7 +451,7 @@ class ProductController extends PageController
         return json_encode($response);
     }
 
-    public function updateStokHarga(HTTPRequest $request)
+    public function updateHarga(HTTPRequest $request)
     {
         $id = $request->params()["ID"];
         $warnaProduct = WarnaProduct::get()->byID($id);
@@ -472,15 +468,11 @@ class ProductController extends PageController
             ];
         } else {
             // Validation required
-            $Jumlah = (isset($_REQUEST['Jumlah'])) ? $_REQUEST['Jumlah'] : '';
             $Harga = (isset($_REQUEST['Harga'])) ? $_REQUEST['Harga'] : '';
             $TglHargaMulaiBerlaku = (isset($_REQUEST['TglHargaMulaiBerlaku'])) ? $_REQUEST['TglHargaMulaiBerlaku'] : '';
 
-            if (trim($Jumlah) == null || trim($Harga) == null || trim($TglHargaMulaiBerlaku) == null) {
+            if (trim($Harga) == null || trim($TglHargaMulaiBerlaku) == null) {
                 $message = [];
-                if (trim($Jumlah) == null) {
-                    array_push($message, "Jumlah tidak boleh kosong");
-                }
                 if (trim($Harga) == null) {
                     array_push($message, "Harga tidak boleh kosong");
                 }
@@ -497,8 +489,7 @@ class ProductController extends PageController
             } else {
                 // Validate data modified
                 $hargaTerakhir = HargaProduct::get()->where('WarnaProductID = ' . $id)->last();
-                $jumlahterakhir = JumlahProduct::get()->where('WarnaProductID = ' . $id)->last();
-                if ($hargaTerakhir->Harga == str_replace(".", "", Convert::raw2sql($_REQUEST['Harga'])) && $jumlahterakhir->Jumlah == Convert::raw2sql($_REQUEST['Jumlah'])) {
+                if ($hargaTerakhir->Harga == str_replace(".", "", Convert::raw2sql($_REQUEST['Harga']))) {
                     $response = [
                         "status" => [
                             "code" => 304,
@@ -508,7 +499,7 @@ class ProductController extends PageController
                             ]
                         ]
                     ];
-                } elseif ($hargaTerakhir->Harga != str_replace(".", "", Convert::raw2sql($_REQUEST['Harga'])) || $jumlahterakhir->Jumlah != Convert::raw2sql($_REQUEST['Jumlah'])) {
+                } elseif ($hargaTerakhir->Harga != str_replace(".", "", Convert::raw2sql($_REQUEST['Harga']))) {
                     if ($hargaTerakhir->Harga != str_replace(".", "", Convert::raw2sql($_REQUEST['Harga']))) {
                         $hargaProduct = HargaProduct::create();
                         $hargaProduct->Harga = str_replace(".", "", Convert::raw2sql($_REQUEST['Harga']));
@@ -516,12 +507,165 @@ class ProductController extends PageController
                         $hargaProduct->WarnaProductID = $id;
                         $hargaProduct->write();
                     }
-                    if ($jumlahterakhir->Jumlah != Convert::raw2sql($_REQUEST['Jumlah'])) {
-                        $jumlahProduct = JumlahProduct::create();
-                        $jumlahProduct->Jumlah = Convert::raw2sql($_REQUEST['Jumlah']);
-                        $jumlahProduct->WarnaProductID = $id;
-                        $jumlahProduct->write();
+                    $response = [
+                        "status" => [
+                            "code" => 200,
+                            "description" => "OK",
+                            "message" => [
+                                "Berhasil diupdate"
+                            ]
+                        ],
+                    ];
+                }
+            }
+        }
+
+        $this->response->addHeader('Content-Type', 'application/json');
+        return json_encode($response);
+    }
+
+    public function historyHarga(HTTPRequest $request)
+    {
+        // Validate Required Parameter
+        if (!isset($_REQUEST['ProductID']) || !isset($_REQUEST['WarnaProductID'])) {
+            $message = [];
+            if (!isset($_REQUEST['ProductID'])) {
+                array_push($message, 'Parameter ProductID tidak ditemukan.');
+            }
+            if (!isset($_REQUEST['WarnaProductID'])) {
+                array_push($message, 'Parameter WarnaProductID tidak ditemukan.');
+            }
+
+            $response = [
+                "status" => [
+                    "code" => 422,
+                    "description" => "Unprocessable Entity",
+                    "message" => $message
+                ]
+            ];
+        } else {
+            $ProductID = $_REQUEST['ProductID'];
+            $WarnaProductID = $_REQUEST['WarnaProductID'];
+
+            $product = Product::get()->byID($ProductID);
+            $warnaProduct = WarnaProduct::get()->byID($WarnaProductID);
+
+            $dataHargaArray = array();
+            $dataHistoryHarga = HargaProduct::get()->where('WarnaProductID = ' . $WarnaProductID)->sort('Created', 'DESC');
+            // Validate Data ParameterValid ?
+            if (is_null($product) || is_null($warnaProduct) || is_null($dataHistoryHarga)) {
+                $message = [];
+                if (is_null($product)) {
+                    array_push($message, 'Product dengan ID ' . $ProductID . ' tidak ditemukan');
+                }
+                if (is_null($warnaProduct)) {
+                    array_push($message, 'Warna Product dengan ID ' . $WarnaProductID . ' tidak ditemukan');
+                }
+                if (is_null($dataHistoryHarga)) {
+                    array_push($message, 'Data history harga dengan WarnaProductID ' . $WarnaProductID . ' tidak ditemukan');
+                }
+                $response = [
+                    "status" => [
+                        "code" => 404,
+                        "description" => "Not Found",
+                        "message" => $message
+                    ]
+                ];
+            } else {
+                $hargaAktif = $this->getHargaAktif($warnaProduct->ID);
+
+                foreach ($dataHistoryHarga as $harga) {
+                    $temparr = array();
+                    $temparr['Harga'] = $harga->Harga;
+                    if ($hargaAktif->ID == $harga->ID) {
+                        $temparr['Status'] = "Aktif";
+                    } else {
+                        $temparr['Status'] = "Non Aktif";
                     }
+                    $temparr['TglMulaiBerlaku'] = $harga->TglMulaiBerlaku;
+
+                    $dataHargaArray[] = $temparr;
+                }
+
+                $response = [
+                    "status" => [
+                        "code" => 200,
+                        "description" => "OK",
+                        "message" => [
+                            "Data History Harga Product"
+                        ]
+                    ],
+                    "data" => [
+                        "product" => [
+                            "ID" => $product->ID,
+                            "NamaProduct" => $product->NamaProduct,
+                            "WarnaProduct" => $warnaProduct->Warna()->NamaWarna,
+                        ],
+                        "historyHarga" => $dataHargaArray
+                    ]
+                ];
+            }
+        }
+
+        $this->response->addHeader('Content-Type', 'application/json');
+        return json_encode($response);
+    }
+
+    public function updateStok(HTTPRequest $request)
+    {
+        $id = $request->params()["ID"];
+        $warnaProduct = WarnaProduct::get()->byID($id);
+        // Validation null 
+        if (is_null($warnaProduct)) {
+            $response = [
+                "status" => [
+                    "code" => 404,
+                    "description" => "Not Found",
+                    "message" => [
+                        "Pilihan Product dengan WarnaProductID " . $id . " tidak ditemukan"
+                    ]
+                ]
+            ];
+        } else {
+            // Validation required
+            $Stok = (isset($_REQUEST['Stok'])) ? $_REQUEST['Stok'] : '';
+
+            if (trim($Stok) == null) {
+                $response = [
+                    "status" => [
+                        "code" => 422,
+                        "description" => "Unprocessable Entity",
+                        "message" => [
+                            'Stok tidak boleh kosong'
+                        ]
+                    ]
+                ];
+            } else {
+                $updateStok = Convert::raw2sql($_REQUEST['Stok']);
+                // Validate data modified
+                if ($warnaProduct->Stok == $updateStok) {
+                    $response = [
+                        "status" => [
+                            "code" => 304,
+                            "description" => "Not Modified",
+                            "message" => [
+                                "Tidak ada perubahan data"
+                            ]
+                        ]
+                    ];
+                } else {
+                    // Save History Stok 
+                    $jumlahProduct = JumlahProduct::create();
+                    $jumlahProduct->Jumlah = ($updateStok - $warnaProduct->Stok);
+                    $jumlahProduct->WarnaProductID = $warnaProduct->ID;
+                    $jumlahProduct->write();
+
+                    // Update Stok
+                    $warnaProduct->update([
+                        'Stok' => $updateStok,
+                    ]);
+                    $warnaProduct->write();
+
                     $response = [
                         "status" => [
                             "code" => 200,
@@ -591,7 +735,7 @@ class ProductController extends PageController
                 foreach ($dataHistoryStok as $stok) {
                     $temparr = array();
                     $temparr['Tanggal'] = $stok->Created;
-                    $temparr['JumlahStok'] = $stok->Jumlah;
+                    $temparr['Jumlah'] = $stok->Jumlah;
                     $dataStokArray[] = $temparr;
                 }
 
@@ -609,6 +753,7 @@ class ProductController extends PageController
                             "ID" => $product->ID,
                             "NamaProduct" => $product->NamaProduct,
                             "WarnaProduct" => $warnaProduct->Warna()->NamaWarna,
+                            "Stok" => $warnaProduct->Stok,
                         ],
                         "historyStok" => $dataStokArray
                     ]
@@ -620,92 +765,6 @@ class ProductController extends PageController
         return json_encode($response);
     }
 
-    public function historyHarga(HTTPRequest $request)
-    {
-        // Validate Required Parameter
-        if (!isset($_REQUEST['ProductID']) || !isset($_REQUEST['WarnaProductID'])) {
-            $message = [];
-            if (!isset($_REQUEST['ProductID'])) {
-                array_push($message, 'Parameter ProductID tidak ditemukan.');
-            }
-            if (!isset($_REQUEST['WarnaProductID'])) {
-                array_push($message, 'Parameter WarnaProductID tidak ditemukan.');
-            }
-
-            $response = [
-                "status" => [
-                    "code" => 422,
-                    "description" => "Unprocessable Entity",
-                    "message" => $message
-                ]
-            ];
-        } else {
-            $ProductID = $_REQUEST['ProductID'];
-            $WarnaProductID = $_REQUEST['WarnaProductID'];
-
-            $product = Product::get()->byID($ProductID);
-            $warnaProduct = WarnaProduct::get()->byID($WarnaProductID);
-
-            $dataHargaArray = array();
-            $dataHistoryHarga = HargaProduct::get()->where('WarnaProductID = ' . $WarnaProductID)->sort('Created', 'DESC');
-            // Validate Data ParameterValid ?
-            if (is_null($product) || is_null($warnaProduct) || is_null($dataHistoryHarga)) {
-                $message = [];
-                if (is_null($product)) {
-                    array_push($message, 'Product dengan ID ' . $ProductID . ' tidak ditemukan');
-                }
-                if (is_null($warnaProduct)) {
-                    array_push($message, 'Warna Product dengan ID ' . $WarnaProductID . ' tidak ditemukan');
-                }
-                if (is_null($dataHistoryHarga)) {
-                    array_push($message, 'Data history harga dengan WarnaProductID ' . $WarnaProductID . ' tidak ditemukan');
-                }
-                $response = [
-                    "status" => [
-                        "code" => 404,
-                        "description" => "Not Found",
-                        "message" => $message
-                    ]
-                ];
-            } else {
-                $hargaAktif = HargaProduct::get()->where("WarnaProductID = " . $warnaProduct->ID . " AND TglMulaiBerlaku <= '" . date("Y-m-d H:i:s") . "'")->last();
-
-                foreach ($dataHistoryHarga as $harga) {
-                    $temparr = array();
-                    $temparr['Harga'] = $harga->Harga;
-                    if ($hargaAktif->ID == $harga->ID) {
-                        $temparr['Status'] = "Aktif";
-                    } else {
-                        $temparr['Status'] = "Non Aktif";
-                    }
-                    $temparr['TglMulaiBerlaku'] = $harga->TglMulaiBerlaku;
-
-                    $dataHargaArray[] = $temparr;
-                }
-
-                $response = [
-                    "status" => [
-                        "code" => 200,
-                        "description" => "OK",
-                        "message" => [
-                            "Data History Harga Product"
-                        ]
-                    ],
-                    "data" => [
-                        "product" => [
-                            "ID" => $product->ID,
-                            "NamaProduct" => $product->NamaProduct,
-                            "WarnaProduct" => $warnaProduct->Warna()->NamaWarna,
-                        ],
-                        "historyHarga" => $dataHargaArray
-                    ]
-                ];
-            }
-        }
-
-        $this->response->addHeader('Content-Type', 'application/json');
-        return json_encode($response);
-    }
 
     public function search(HTTPRequest $request)
     {
@@ -848,5 +907,10 @@ class ProductController extends PageController
 
         $this->response->addHeader('Content-Type', 'application/json');
         return json_encode($response);
+    }
+
+    public function buy(HTTPRequest $request)
+    {
+        // 
     }
 }

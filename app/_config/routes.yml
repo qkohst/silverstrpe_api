@@ -10,3 +10,4 @@ SilverStripe\Control\Director:
     "api/v1/dashboard": DashboardController
     "api/v1/warna//$Action/$ID": WarnaController
     "api/v1/product//$Action/$ID": ProductController
+    "api/v1/pembelian//$Action/$ID": PembelianProductController
