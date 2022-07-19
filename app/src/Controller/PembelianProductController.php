@@ -2,6 +2,7 @@
 
 use SilverStripe\Control\HTTPRequest;
 use SilverStripe\Core\Convert;
+use SilverStripe\ORM\DB;
 
 class PembelianProductController extends ProductController
 {
@@ -12,6 +13,8 @@ class PembelianProductController extends ProductController
 
     public function buy(HTTPRequest $request)
     {
+        // print_r($this->getNewKode());
+        // die;
         // // Count data 
         // $CountProduct = 0;
         // $CountJumlahBeli = 0;
@@ -100,12 +103,23 @@ class PembelianProductController extends ProductController
         // }
 
         $values = json_decode($_REQUEST['data']);
-        // Validate  WarnaProductID Exist & Stok
 
         $messageError = [];
+        // Validate Parameter User ID
+        if (!isset($_REQUEST['userID'])) {
+            array_push($messageError, 'userID tidak boleh kosong');
+        } elseif (isset($_REQUEST['userID'])) {
+            // Validate User Exist 
+            $user = User::get()->byID($_REQUEST['userID']);
+            if (!isset($user->ID)) {
+                array_push($messageError, 'User dengan ID ' . $_REQUEST['userID'] . ' tidak ditemukan');
+            }
+        }
+
+        // Validate  WarnaProductID Exist & Stok
         foreach ($values as $value) {
             $warnaProduct = WarnaProduct::get()->byID($value->WarnaProductID);
-            if ($warnaProduct == null) {
+            if (!isset($warnaProduct->ID)) {
                 array_push($messageError, 'Product dengan WarnaProductID ' . $value->WarnaProductID . ' tidak tersedia');
             } elseif ($warnaProduct->Stok < $value->JumlahBeli) {
                 array_push($messageError, 'Sisa stok untuk product dengan WarnaProductID ' . $value->WarnaProductID . ' tidak mencukupi');
@@ -141,7 +155,7 @@ class PembelianProductController extends ProductController
 
                 // Save History Stok 
                 $jumlahProduct = JumlahProduct::create();
-                $jumlahProduct->Jumlah = -$value->JumlahBeli;
+                $jumlahProduct->Jumlah = ($value->JumlahBeli * -1);
                 $jumlahProduct->WarnaProductID = $warnaProduct->ID;
                 $jumlahProduct->write();
 
@@ -169,8 +183,17 @@ class PembelianProductController extends ProductController
 
     protected function getNewKode()
     {
-        $countPembelianBulanIni = Pembelian::get()->where("DATE_FORMAT(Created, '%Y%m') = " . date("Ym"))->count();
-        $newKode = 'PE/' . date("m/Y/0") . ($countPembelianBulanIni + 1);
+        $pembelianTerakhir = Pembelian::get()->where("DATE_FORMAT(Created, '%Y%m') = " . date("Ym"))->last();
+
+        if (!isset($pembelianTerakhir->ID)) {
+            $nomorUrut = 1;
+        } else {
+            $maxKode = $pembelianTerakhir->Kode;
+            $nomorUrut = (int) substr($maxKode, 11, 5);
+            $nomorUrut++;
+        }
+
+        $newKode = 'PE/' . date("m/Y/") . sprintf("%05s", $nomorUrut);
         return $newKode;
     }
 }
