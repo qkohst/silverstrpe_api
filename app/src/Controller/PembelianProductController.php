@@ -117,25 +117,18 @@ class PembelianProductController extends ProductController
         } else {
             $tahun = date('Y');
         }
-        $dataPenjualan = Pembelian::get();
 
+        // Graphic per tahun 
         if (!isset($_REQUEST['bulan'])) {
-            // Graphic berdasarkan tahun 
-            $sql = "SELECT COUNT(ID) as jumlah, DATE_FORMAT(Created, '%M') AS bulan
-                    FROM Pembelian 
-                    WHERE DATE_FORMAT(Created, '%Y') = " . $tahun . "
-                    GROUP BY YEAR(Created), MONTH(Created)";
-
-            $dataPenjualan = DB::query($sql);
-
             $result = [];
-            foreach ($dataPenjualan as $penjualan) {
+            for ($i = 1; $i <= 12; $i++) {
+                $countTransaksi = Pembelian::get()->where("DATE_FORMAT(Created, '%Y%m') = " . $tahun . sprintf("%02s", $i));
                 $result[] = [
-                    'Bulan' => $penjualan['bulan'],
-                    'TotalPenjualan' => $penjualan['jumlah']
+                    'Bulan' => sprintf("%02s", $i),
+                    'TotalTransaksi' =>  $countTransaksi,
+                    'TotalPenjualan' => 'asas'
                 ];
             }
-
             $response = [
                 "status" => [
                     "code" => 200,
@@ -150,22 +143,20 @@ class PembelianProductController extends ProductController
                 ]
             ];
         } elseif (isset($_REQUEST['bulan'])) {
-            // Graphic berdasarkan bulan
+            // graphic per bulan 
             $bulan = $_REQUEST['bulan'];
 
-            $sql = "SELECT COUNT(ID) as jumlah, DATE_FORMAT(Created, '%d') AS tanggal
-            FROM Pembelian 
-            WHERE DATE_FORMAT(Created, '%Y') = " . $tahun . " 
-            AND DATE_FORMAT(Created, '%m') = " . $bulan . " 
-            GROUP BY MONTH(Created), DAY(Created)";
-
-            $dataPenjualan = DB::query($sql);
+            $start_date = "01-" . $bulan . "-" . $tahun;
+            $start_time = strtotime($start_date);
+            $end_time = strtotime("+1 month", $start_time);
 
             $result = [];
-            foreach ($dataPenjualan as $penjualan) {
+            for ($i = $start_time; $i < $end_time; $i += 86400) {
+                $countTransaksi = Pembelian::get()->where("DATE_FORMAT(Created, '%Y%m%d') = " . $tahun . $bulan . date('d', $i))->count();
                 $result[] = [
-                    'Tanggal' => $penjualan['tanggal'],
-                    'TotalPenjualan' => $penjualan['jumlah']
+                    'Tanggal' => date('m-d', $i),
+                    'TotalTransaksi' => $countTransaksi,
+                    'TotalPenjualan' => 'fdfd'
                 ];
             }
 
@@ -178,6 +169,7 @@ class PembelianProductController extends ProductController
                     ]
                 ],
                 "data" => [
+                    "tahun" => $tahun,
                     "bulan" => $bulan,
                     "result" => $result
                 ]
