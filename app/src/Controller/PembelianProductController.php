@@ -114,68 +114,156 @@ class PembelianProductController extends ProductController
         // Check Parameter Request 
         if (isset($_REQUEST['tahun'])) {
             $tahun = $_REQUEST['tahun'];
+            // Validate 
+            if ($tahun > date('Y') || $tahun < 2000) {
+                $response = [
+                    "status" => [
+                        "code" => 422,
+                        "description" => "Unprocessable Entity",
+                        "message" => [
+                            'tahun yang anda kirim tidak valid'
+                        ]
+                    ]
+                ];
+                $this->response->addHeader('Content-Type', 'application/json');
+                return json_encode($response);
+                die;
+            }
         } else {
             $tahun = date('Y');
         }
 
         // Graphic per tahun 
-        if (!isset($_REQUEST['bulan'])) {
-            $result = [];
-            for ($i = 1; $i <= 12; $i++) {
-                $countTransaksi = Pembelian::get()->where("DATE_FORMAT(Created, '%Y%m') = " . $tahun . sprintf("%02s", $i));
-                $result[] = [
-                    'Bulan' => sprintf("%02s", $i),
-                    'TotalTransaksi' =>  $countTransaksi,
-                    'TotalPenjualan' => 'asas'
-                ];
+        // if (!isset($_REQUEST['bulan'])) {
+        //     $result = [];
+        //     for ($i = 1; $i <= 12; $i++) {
+        //         $countTransaksi = Pembelian::get()->where("DATE_FORMAT(Created, '%Y%m') = " . $tahun . sprintf("%02s", $i));
+        //         $penjualanProduct = PembelianProduct::get()->where("DATE_FORMAT(Created, '%Y%m') = " . $tahun . sprintf("%02s", $i));
+
+        //         $result[] = [
+        //             'Bulan' => sprintf("%02s", $i),
+        //             'TotalTransaksi' =>  $countTransaksi->count(),
+        //             'TotalPenjualan' => $penjualanProduct->sum('HargaBeli'),
+        //         ];
+        //     }
+        //     $response = [
+        //         "status" => [
+        //             "code" => 200,
+        //             "description" => "OK",
+        //             "message" => [
+        //                 'Grafik penjualan tahun ' . $tahun
+        //             ]
+        //         ],
+        //         "data" => [
+        //             "tahun" => $tahun,
+        //             "result" => $result
+        //         ]
+        //     ];
+        // } elseif (isset($_REQUEST['bulan'])) {
+        //     // graphic per bulan 
+        //     $bulan = $_REQUEST['bulan'];
+
+        //     // Validate 
+        //     if ($bulan > 12 || $bulan < 1) {
+        //         $response = [
+        //             "status" => [
+        //                 "code" => 422,
+        //                 "description" => "Unprocessable Entity",
+        //                 "message" => [
+        //                     'bulan yang anda kirim tidak valid'
+        //                 ]
+        //             ]
+        //         ];
+        //         $this->response->addHeader('Content-Type', 'application/json');
+        //         return json_encode($response);
+        //         die;
+        //     }
+
+        //     $start_date = "01-" . $bulan . "-" . $tahun;
+        //     $start_time = strtotime($start_date);
+        //     $end_time = strtotime("+1 month", $start_time);
+
+        //     $result = [];
+        //     for ($i = $start_time; $i < $end_time; $i += 86400) {
+        //         $countTransaksi = Pembelian::get()->where("DATE_FORMAT(Created, '%Y%m%d') = " . $tahun . $bulan . date('d', $i))->count();
+        //         $penjualanProduct = PembelianProduct::get()->where("DATE_FORMAT(Created, '%Y%m%d') = " . $tahun . $bulan . date('d', $i));
+
+        //         $result[] = [
+        //             'Tanggal' => date('m-d', $i),
+        //             'TotalTransaksi' => $countTransaksi,
+        //             'ProductTerjual' => $penjualanProduct->sum('JumlahBeli'),
+        //             'TotalPenjualan' => $penjualanProduct->sum('HargaBeli')
+        //         ];
+        //     }
+
+        //     $response = [
+        //         "status" => [
+        //             "code" => 200,
+        //             "description" => "OK",
+        //             "message" => [
+        //                 'Grafik penjualan tahun ' . $tahun . ' bulan ' . $bulan
+        //             ]
+        //         ],
+        //         "data" => [
+        //             "tahun" => $tahun,
+        //             "bulan" => $bulan,
+        //             "result" => $result
+        //         ]
+        //     ];
+        // }
+
+        $grafikTahunan = DB::query("SELECT count(DISTINCT(Pembelian.Kode)) AS total_transaksi,
+        SUM(PembelianProduct.JumlahBeli) AS product_terjual,
+        SUM(PembelianProduct.HargaBeli) AS total_penjualan,
+        DATE_FORMAT(Pembelian.Created, '%m') as bulan
+        FROM Pembelian
+        INNER JOIN PembelianProduct
+        ON Pembelian.ID = PembelianProduct.PembelianID
+        WHERE Pembelian.Created LIKE '" . $tahun . "%'
+        GROUP BY bulan");
+
+        $temparr = array();
+        for ($i = 1; $i <= 12; $i++) {
+
+            $isDataExists = false;
+
+            foreach ($grafikTahunan as $data) {
+                if ($data['bulan'] == sprintf("%02s", $i)) {
+
+                    $isDataExists = true;
+
+                    array_push($temparr, [
+                        "Bulan" => $data['bulan'],
+                        'TotalTransaksi' => $data['total_transaksi'],
+                        'ProductTerjual' => $data['product_terjual'],
+                        'TotalPenjualan' => $data['total_penjualan']
+                    ]);
+                }
             }
-            $response = [
-                "status" => [
-                    "code" => 200,
-                    "description" => "OK",
-                    "message" => [
-                        'Grafik penjualan tahun ' . $tahun
-                    ]
-                ],
-                "data" => [
-                    "tahun" => $tahun,
-                    "result" => $result
-                ]
-            ];
-        } elseif (isset($_REQUEST['bulan'])) {
-            // graphic per bulan 
-            $bulan = $_REQUEST['bulan'];
 
-            $start_date = "01-" . $bulan . "-" . $tahun;
-            $start_time = strtotime($start_date);
-            $end_time = strtotime("+1 month", $start_time);
-
-            $result = [];
-            for ($i = $start_time; $i < $end_time; $i += 86400) {
-                $countTransaksi = Pembelian::get()->where("DATE_FORMAT(Created, '%Y%m%d') = " . $tahun . $bulan . date('d', $i))->count();
-                $result[] = [
-                    'Tanggal' => date('m-d', $i),
-                    'TotalTransaksi' => $countTransaksi,
-                    'TotalPenjualan' => 'fdfd'
-                ];
+            if (!$isDataExists) {
+                array_push($temparr, [
+                    "Bulan" => sprintf("%02s", $i),
+                    'TotalTransaksi' => 0,
+                    'ProductTerjual' => 0,
+                    'TotalPenjualan' => 0
+                ]);
             }
-
-            $response = [
-                "status" => [
-                    "code" => 200,
-                    "description" => "OK",
-                    "message" => [
-                        'Grafik penjualan tahun ' . $tahun . ' bulan ' . $bulan
-                    ]
-                ],
-                "data" => [
-                    "tahun" => $tahun,
-                    "bulan" => $bulan,
-                    "result" => $result
-                ]
-            ];
         }
 
+        $response = [
+            "status" => [
+                "code" => 200,
+                "description" => "OK",
+                "message" => [
+                    'Grafik penjualan tahun ' . $tahun
+                ]
+            ],
+            "data" => [
+                "tahun" => $tahun,
+                "result" => $temparr
+            ]
+        ];
         $this->response->addHeader('Content-Type', 'application/json');
         return json_encode($response);
     }
