@@ -933,7 +933,23 @@ class ProductController extends PageController
             }
 
             if (isset($datas['maxPrice']) && isset($datas['minPrice'])) {
-                $andWhere = "AND HargaProduct.Harga >= " . $minPrice . " AND HargaProduct.Harga <= " . $maxPrice;
+                // Validate Range Price
+                if ($minPrice >= $maxPrice) {
+                    $response = [
+                        "status" => [
+                            "code" => 422,
+                            "description" => "Unprocessable Entity",
+                            "message" => [
+                                'Masukkan kisaran harga yang valid'
+                            ]
+                        ]
+                    ];
+                    $this->response->addHeader('Content-Type', 'application/json');
+                    return json_encode($response);
+                    die;
+                } elseif ($maxPrice > $minPrice) {
+                    $andWhere = "AND HargaProduct.Harga >= " . $minPrice . " AND HargaProduct.Harga <= " . $maxPrice;
+                }
             }
         }
 
@@ -941,13 +957,34 @@ class ProductController extends PageController
         if (isset($datas['warna'])) {
             $filterWarna = strtoupper($datas['warna']);
             $dataWarna = Warna::get()->where("NamaWarna LIKE '%{$filterWarna}%'");
-            $dataIDWarna = [];
-            foreach ($dataWarna as $warna) {
-                $dataIDWarna[] = $warna->ID;
-            }
-            $idWarna = '(' . implode(',', $dataIDWarna) . ')';
 
-            $andWhere = $andWhere . " AND WarnaProduct.WarnaID IN " . $idWarna;
+            if ($dataWarna->count() != 0) {
+                $dataIDWarna = [];
+                foreach ($dataWarna as $warna) {
+                    $dataIDWarna[] = $warna->ID;
+                }
+                $idWarna = '(' . implode(',', $dataIDWarna) . ')';
+                $andWhere = $andWhere . " AND WarnaProduct.WarnaID IN " . $idWarna;
+            } else {
+                $response = [
+                    "status" => [
+                        "code" => 404,
+                        "description" => "Not Found",
+                        "message" => [
+                            'Produk tidak ditemukan.'
+                        ]
+                    ]
+                ];
+                $this->response->addHeader('Content-Type', 'application/json');
+                return json_encode($response);
+                die;
+            }
+        }
+
+        // ORDER BY PRICE 
+        $orderBy = "";
+        if (isset($datas['orderBy'])) {
+            $orderBy = "ORDER BY HargaProduct.Harga " . $datas['orderBy'];
         }
 
         $sql = "SELECT Product.*
@@ -957,8 +994,7 @@ class ProductController extends PageController
         INNER JOIN HargaProduct 
         ON HargaProduct.WarnaProductID = WarnaProduct.ID
         WHERE HargaProduct.TglMulaiBerlaku <= '" . date("Y-m-d H:i:s") . "'
-        " . $andWhere . "
-        GROUP BY Product.ID";
+        " . $andWhere . $orderBy;
 
         $dataProduct = DB::query($sql);
 
