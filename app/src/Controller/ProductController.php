@@ -21,6 +21,7 @@ class ProductController extends PageController
         'historyStok',
         'search',
         'suggest',
+        'filter'
     ];
 
     private function getHargaAktif($id)
@@ -899,6 +900,112 @@ class ProductController extends PageController
                     "description" => "Not Found",
                     "message" => [
                         'Suggestion tidak ditemukan'
+                    ]
+                ]
+            ];
+        }
+
+        $this->response->addHeader('Content-Type', 'application/json');
+        return json_encode($response);
+    }
+
+    public function filter(HTTPRequest $request)
+    {
+        $datas = $request->requestVars();
+
+        $dataProduct = Product::get()->where('Deleted = 0');
+
+        $andWhere = "";
+        // FILTER BY HARGA PRODUCT
+        if (isset($datas['minPrice']) || isset($datas['maxPrice'])) {
+            if (isset($datas['minPrice'])) {
+                $minPrice = $datas['minPrice'];
+                $minPrice = str_replace('.', '', $minPrice);
+                $minPrice = Convert::raw2sql($minPrice);
+
+                $andWhere = "AND HargaProduct.Harga >= " . $minPrice;
+            }
+            if (isset($datas['maxPrice'])) {
+                $maxPrice = $datas['maxPrice'];
+                $maxPrice = str_replace('.', '', $maxPrice);
+                $maxPrice = Convert::raw2sql($maxPrice);
+                $andWhere = "AND HargaProduct.Harga <= " . $maxPrice;
+            }
+
+            if (isset($datas['maxPrice']) && isset($datas['minPrice'])) {
+                $andWhere = "AND HargaProduct.Harga >= " . $minPrice . " AND HargaProduct.Harga <= " . $maxPrice;
+            }
+        }
+
+        // FILTER BY WARNA PRODUCT
+        if (isset($datas['warna'])) {
+            $filterWarna = strtoupper($datas['warna']);
+            $dataWarna = Warna::get()->where("NamaWarna LIKE '%{$filterWarna}%'");
+            $dataIDWarna = [];
+            foreach ($dataWarna as $warna) {
+                $dataIDWarna[] = $warna->ID;
+            }
+            $idWarna = '(' . implode(',', $dataIDWarna) . ')';
+
+            $andWhere = $andWhere . " AND WarnaProduct.WarnaID IN " . $idWarna;
+        }
+
+        $sql = "SELECT Product.*
+        FROM Product 
+        INNER JOIN WarnaProduct
+        ON WarnaProduct.ProductID = Product.ID
+        INNER JOIN HargaProduct 
+        ON HargaProduct.WarnaProductID = WarnaProduct.ID
+        WHERE HargaProduct.TglMulaiBerlaku <= '" . date("Y-m-d H:i:s") . "'
+        " . $andWhere . "
+        GROUP BY Product.ID";
+
+        $dataProduct = DB::query($sql);
+
+        if ($dataProduct->numRecords() > 0) {
+            $temp_results = [];
+            foreach ($dataProduct as $product) {
+                $prod = Product::get()->byID($product['ID']);
+
+                $temparr = [];
+                $dataPilihanProduct = WarnaProduct::get()->where('ProductID = ' . $product['ID']);
+                foreach ($dataPilihanProduct as $warnaProduct) {
+                    $hargaAktif = $this->getHargaAktif($warnaProduct->ID);
+
+                    $pil = array();
+                    $pil['ID'] = $warnaProduct->ID;
+                    $pil['Warna'] = $warnaProduct->Warna->NamaWarna;
+                    $pil['Stok'] = $warnaProduct->Stok;
+                    $pil['Harga'] = $hargaAktif->Harga;
+                    $pil['TglMulaiBerlaku'] = $hargaAktif->TglMulaiBerlaku;
+
+                    $temparr[] = $pil;
+                }
+
+                $temp_results[] = [
+                    'ID' => $prod->ID,
+                    'NamaProduct' => $prod->NamaProduct,
+                    'PilihanProduct' => $temparr
+                ];
+            }
+
+            $response = [
+                "status" => [
+                    "code" => 200,
+                    "description" => "OK",
+                    "message" => [
+                        'Hasil filter product.'
+                    ]
+                ],
+                "data" => $temp_results
+            ];
+        } else {
+            $response = [
+                "status" => [
+                    "code" => 404,
+                    "description" => "Not Found",
+                    "message" => [
+                        'Produk tidak ditemukan.'
                     ]
                 ]
             ];
