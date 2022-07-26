@@ -948,7 +948,7 @@ class ProductController extends PageController
                     return json_encode($response);
                     die;
                 } elseif ($maxPrice > $minPrice) {
-                    $andWhere = "AND HargaProduct.Harga >= " . $minPrice . " AND HargaProduct.Harga <= " . $maxPrice;
+                    $andWhere = "AND HargaProduct.Harga BETWEEN $minPrice AND $maxPrice";
                 }
             }
         }
@@ -956,35 +956,21 @@ class ProductController extends PageController
         // FILTER BY WARNA PRODUCT
         if (isset($datas['warna'])) {
             $filterWarna = strtoupper($datas['warna']);
-            $dataWarna = Warna::get()->where("NamaWarna LIKE '%{$filterWarna}%'");
-
-            if ($dataWarna->count() != 0) {
-                $dataIDWarna = [];
-                foreach ($dataWarna as $warna) {
-                    $dataIDWarna[] = $warna->ID;
-                }
-                $idWarna = '(' . implode(',', $dataIDWarna) . ')';
-                $andWhere = $andWhere . " AND WarnaProduct.WarnaID IN " . $idWarna;
-            } else {
-                $response = [
-                    "status" => [
-                        "code" => 404,
-                        "description" => "Not Found",
-                        "message" => [
-                            'Produk tidak ditemukan.'
-                        ]
-                    ]
-                ];
-                $this->response->addHeader('Content-Type', 'application/json');
-                return json_encode($response);
-                die;
-            }
+            $andWhere = $andWhere . " AND Warna.NamaWarna LIKE '%{$filterWarna}%'";
         }
 
         // ORDER BY PRICE 
         $orderBy = "";
-        if (isset($datas['orderBy'])) {
-            $orderBy = "ORDER BY HargaProduct.Harga " . $datas['orderBy'];
+        if (isset($datas['sortBy'])) {
+            if ($datas['sortBy'] == 'Harga') {
+                $orderBy = "ORDER BY HargaProduct.Harga " . $datas['order'];
+            }
+            if ($datas['sortBy'] == 'Produtc') {
+                $orderBy = "ORDER BY Product.NamaProduct " . $datas['order'];
+            }
+            if ($datas['sortBy'] == 'Warna') {
+                $orderBy = "ORDER BY Warna.NamaWarna " . $datas['order'];
+            }
         }
 
         $sql = "SELECT Product.*
@@ -993,6 +979,8 @@ class ProductController extends PageController
         ON WarnaProduct.ProductID = Product.ID
         INNER JOIN HargaProduct 
         ON HargaProduct.WarnaProductID = WarnaProduct.ID
+        INNER JOIN Warna
+        ON Warna.ID = WarnaProduct.WarnaID
         WHERE HargaProduct.TglMulaiBerlaku <= '" . date("Y-m-d H:i:s") . "'
         " . $andWhere . $orderBy;
 
